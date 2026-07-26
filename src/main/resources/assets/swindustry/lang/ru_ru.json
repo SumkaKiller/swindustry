@@ -1,0 +1,58 @@
+{
+  "itemGroup.swindustry": "SW: Промышленность",
+
+  "block.swindustry.primitive_campfire": "Примитивный костёр",
+  "block.swindustry.raw_clay_bricks": "Сырые глиняные кирпичи",
+  "block.swindustry.clay_kiln_port": "Загрузочное отверстие",
+
+  "item.swindustry.soot": "Сажа",
+  "item.swindustry.bronze_sword": "Бронзовый меч",
+  "item.swindustry.bronze_pickaxe": "Бронзовая кирка",
+  "item.swindustry.bronze_axe": "Бронзовый топор",
+  "item.swindustry.bronze_shovel": "Бронзовая лопата",
+  "item.swindustry.bronze_hoe": "Бронзовая мотыга",
+  "item.swindustry.bronze_helmet": "Бронзовый шлем",
+  "item.swindustry.bronze_chestplate": "Бронзовая кираса",
+  "item.swindustry.bronze_leggings": "Бронзовые поножи",
+  "item.swindustry.bronze_boots": "Бронзовые ботинки",
+
+  "container.swindustry.clay_kiln": "Глиняная печь",
+  "container.swindustry.clay_kiln.incomplete": "Печь не собрана",
+
+  "hud.swindustry.objective": "ЗАДАЧА %s/%s",
+
+  "message.swindustry.need_strikers": "Возьмите кремень в одну руку и камень в другую",
+  "message.swindustry.kiln_incomplete": "Печь не собрана: не хватает блока на %s, %s, %s",
+  "message.swindustry.kiln_incomplete_unknown": "Печь не собрана",
+
+  "progression.swindustry.chop_wood": "Нарубите дерева",
+  "progression.swindustry.chop_wood.hint": "Голыми руками. Всё дальнейшее начинается с бревна.",
+  "progression.swindustry.build_campfire": "Сложите костёр",
+  "progression.swindustry.build_campfire.hint": "Три палки и два бревна. Огня пока нет — только дрова.",
+  "progression.swindustry.gather_strikers": "Найдите кремень и камень",
+  "progression.swindustry.gather_strikers.hint": "Кремень прячется в гравии у воды. Камни валяются прямо на земле.",
+  "progression.swindustry.light_fire": "Высеките искру",
+  "progression.swindustry.light_fire.hint": "Кремень в одной руке, камень в другой, костёр под курсором. С первого раза не выйдет.",
+  "progression.swindustry.rake_charcoal": "Дайте костру прогореть",
+  "progression.swindustry.rake_charcoal.hint": "Он погаснет сам. Разберите угли — там древесный уголь и сажа.",
+  "progression.swindustry.build_kiln": "Постройте глиняную печь",
+  "progression.swindustry.build_kiln.hint": "43 сырых кирпича вокруг загрузочного отверстия. Один блок печью не станет.",
+  "progression.swindustry.smelt_bronze": "Выплавьте бронзу",
+  "progression.swindustry.smelt_bronze.hint": "Руда прячется в валунах на острове. Достать её сможет только печь.",
+  "progression.swindustry.forge_bronze": "Скуйте бронзовый инструмент",
+  "progression.swindustry.forge_bronze.hint": "Кирка, топор, меч — что угодно. На этом каменный век закончен.",
+  "progression.swindustry.complete": "",
+  "progression.swindustry.complete.hint": "",
+
+  "swindustry.configuration.title": "SW: Промышленность",
+  "swindustry.configuration.section.swindustry.common.toml": "SW: Промышленность",
+  "swindustry.configuration.section.swindustry.common.toml.title": "SW: Промышленность",
+  "swindustry.configuration.ignitionChance": "Шанс поджечь костёр одним ударом",
+  "swindustry.configuration.strikeCooldown": "Задержка между ударами, тиков",
+  "swindustry.configuration.requireDistinctStrikers": "Нужны именно кремень и камень",
+  "swindustry.configuration.campfireBurnTicks": "Сколько горит костёр, тиков",
+  "swindustry.configuration.rainExtinguishes": "Дождь тушит костёр",
+  "swindustry.configuration.kilnCookTicks": "Базовое время плавки в печи, тиков",
+  "swindustry.configuration.kilnFuelEfficiency": "Множитель времени горения топлива",
+  "swindustry.configuration.showProgressionHud": "Показывать цель в углу экрана"
+}

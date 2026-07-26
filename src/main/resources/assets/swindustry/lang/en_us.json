@@ -1,0 +1,58 @@
+{
+  "itemGroup.swindustry": "SW: Industry",
+
+  "block.swindustry.primitive_campfire": "Primitive Campfire",
+  "block.swindustry.raw_clay_bricks": "Raw Clay Bricks",
+  "block.swindustry.clay_kiln_port": "Loading Port",
+
+  "item.swindustry.soot": "Soot",
+  "item.swindustry.bronze_sword": "Bronze Sword",
+  "item.swindustry.bronze_pickaxe": "Bronze Pickaxe",
+  "item.swindustry.bronze_axe": "Bronze Axe",
+  "item.swindustry.bronze_shovel": "Bronze Shovel",
+  "item.swindustry.bronze_hoe": "Bronze Hoe",
+  "item.swindustry.bronze_helmet": "Bronze Helmet",
+  "item.swindustry.bronze_chestplate": "Bronze Chestplate",
+  "item.swindustry.bronze_leggings": "Bronze Leggings",
+  "item.swindustry.bronze_boots": "Bronze Boots",
+
+  "container.swindustry.clay_kiln": "Clay Kiln",
+  "container.swindustry.clay_kiln.incomplete": "Kiln incomplete",
+
+  "hud.swindustry.objective": "OBJECTIVE %s/%s",
+
+  "message.swindustry.need_strikers": "Hold flint in one hand and a stone in the other",
+  "message.swindustry.kiln_incomplete": "Kiln incomplete: a block is missing at %s, %s, %s",
+  "message.swindustry.kiln_incomplete_unknown": "Kiln incomplete",
+
+  "progression.swindustry.chop_wood": "Chop some wood",
+  "progression.swindustry.chop_wood.hint": "Bare hands will do. Everything after this starts with a log.",
+  "progression.swindustry.build_campfire": "Build a campfire",
+  "progression.swindustry.build_campfire.hint": "Three sticks and two logs. No fire yet — just the firewood.",
+  "progression.swindustry.gather_strikers": "Find flint and a stone",
+  "progression.swindustry.gather_strikers.hint": "Flint hides in the gravel by the water. Stones lie loose on the ground.",
+  "progression.swindustry.light_fire": "Strike a spark",
+  "progression.swindustry.light_fire.hint": "Flint in one hand, stone in the other, campfire under the cursor. It will not catch first try.",
+  "progression.swindustry.rake_charcoal": "Let the fire burn out",
+  "progression.swindustry.rake_charcoal.hint": "It goes out on its own. Break the embers open for charcoal and soot.",
+  "progression.swindustry.build_kiln": "Build a clay kiln",
+  "progression.swindustry.build_kiln.hint": "43 raw bricks around a loading port. One block will never be a kiln.",
+  "progression.swindustry.smelt_bronze": "Smelt bronze",
+  "progression.swindustry.smelt_bronze.hint": "The ore hides inside the island boulders. Only the kiln will free it.",
+  "progression.swindustry.forge_bronze": "Forge a bronze tool",
+  "progression.swindustry.forge_bronze.hint": "Pickaxe, axe, sword — anything. That is the stone age over.",
+  "progression.swindustry.complete": "",
+  "progression.swindustry.complete.hint": "",
+
+  "swindustry.configuration.title": "SW: Industry",
+  "swindustry.configuration.section.swindustry.common.toml": "SW: Industry",
+  "swindustry.configuration.section.swindustry.common.toml.title": "SW: Industry",
+  "swindustry.configuration.ignitionChance": "Chance one strike lights the campfire",
+  "swindustry.configuration.strikeCooldown": "Ticks between strikes",
+  "swindustry.configuration.requireDistinctStrikers": "Require flint and stone specifically",
+  "swindustry.configuration.campfireBurnTicks": "Campfire burn duration in ticks",
+  "swindustry.configuration.rainExtinguishes": "Rain puts the campfire out",
+  "swindustry.configuration.kilnCookTicks": "Base kiln cook time in ticks",
+  "swindustry.configuration.kilnFuelEfficiency": "Fuel duration multiplier",
+  "swindustry.configuration.showProgressionHud": "Show the objective in the corner"
+}

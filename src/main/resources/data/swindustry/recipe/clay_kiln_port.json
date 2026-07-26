@@ -1,0 +1,18 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "BBB",
+    "B B",
+    "BBB"
+  ],
+  "key": {
+    "B": {
+      "item": "swindustry:raw_clay_bricks"
+    }
+  },
+  "result": {
+    "id": "swindustry:clay_kiln_port",
+    "count": 1
+  }
+}

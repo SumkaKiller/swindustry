@@ -1,0 +1,197 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.neoforged.moddev' version '2.0.141'
+    id 'idea'
+}
+
+tasks.named('wrapper', Wrapper).configure {
+    distributionType = Wrapper.DistributionType.BIN
+}
+
+version = mod_version
+group = mod_group_id
+
+if (providers.gradleProperty('buildOutputDir').isPresent()) {
+    layout.buildDirectory = file(providers.gradleProperty('buildOutputDir').get())
+}
+
+sourceSets.main.resources {
+    srcDir('src/generated/resources')
+    exclude("**/*.bbmodel")
+    exclude("src/generated/**/.cache")
+}
+
+repositories {
+}
+
+base {
+    archivesName = mod_id
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+// ---------------------------------------------------------------------------
+// SW: Worldgen Core
+//
+// This mod hard-depends on its sibling: the bronze ore, the island boulders it
+// spawns in and the ocean dimension all live over there. There is deliberately
+// no *compile* dependency — everything crosses the boundary through resource
+// locations and tags (see ModTags) — but dev runs are useless without it, so the
+// sibling jar is copied into the run directory before every run.
+// ---------------------------------------------------------------------------
+def worldgenCoreProject = file("${rootDir}/../swgencore")
+def worldgenCoreJar = file("${worldgenCoreProject}/build/libs/${worldgen_core_mod_id}-1.0.0.jar")
+
+var installWorldgenCore = tasks.register('installWorldgenCore', Copy) {
+    group = 'sea worthy'
+    description = "Copies the ${worldgen_core_mod_id} jar into run/mods so dev runs have the ocean dimension."
+    from worldgenCoreJar
+    into file("${projectDir}/run/mods")
+    onlyIf {
+        if (!worldgenCoreJar.exists()) {
+            logger.warn("SW: Industry — ${worldgenCoreJar} not found. " +
+                "Build it first (cd ../swgencore && ./gradlew build), otherwise the dev run will " +
+                "fail to load swindustry because its required dependency is missing.")
+            return false
+        }
+        return true
+    }
+}
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        gameTestServer {
+            type = "gameTestServer"
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        data {
+            data()
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+tasks.matching { it.name in ['runClient', 'runServer', 'runData', 'runGameTestServer'] }.configureEach {
+    dependsOn installWorldgenCore
+}
+
+configurations {
+    runtimeClasspath.extendsFrom localRuntime
+}
+
+dependencies {
+}
+
+// Expands the mod metadata template with the gradle properties above.
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [
+            minecraft_version         : minecraft_version,
+            minecraft_version_range   : minecraft_version_range,
+            neo_version               : neo_version,
+            neo_version_range         : neo_version_range,
+            loader_version_range      : loader_version_range,
+            mod_id                    : mod_id,
+            mod_name                  : mod_name,
+            mod_license               : mod_license,
+            mod_version               : mod_version,
+            mod_authors               : mod_authors,
+            mod_description           : mod_description,
+            worldgen_core_mod_id      : worldgen_core_mod_id,
+            worldgen_core_version_range: worldgen_core_version_range,
+    ]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into layout.buildDirectory.dir("generated/sources/modMetadata")
+}
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url = "file://${project.projectDir}/repo"
+        }
+    }
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.compilerArgs << '-Xlint:all,-serial,-processing,-this-escape'
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Headless checks
+//
+// The multiblock framework is arithmetic over BlockPos, so it can be verified
+// without launching the game. Rotation bugs in a multiblock are the kind that
+// look like the player mis-built something, so they are worth failing a build
+// over rather than discovering in a screenshot.
+// ---------------------------------------------------------------------------
+sourceSets {
+    checks {
+        java.srcDir 'src/checks/java'
+        compileClasspath += sourceSets.main.output + sourceSets.main.compileClasspath
+        runtimeClasspath += output + compileClasspath + sourceSets.main.runtimeClasspath
+    }
+}
+
+tasks.register('multiblockChecks', JavaExec) {
+    group = 'verification'
+    description = 'Verifies multiblock pattern geometry and rotation in all four facings.'
+    classpath = sourceSets.checks.runtimeClasspath
+    mainClass = 'com.jokerdayn.swindustry.checks.MultiblockGeometryCheck'
+    dependsOn checksClasses
+    def workDir = layout.buildDirectory.dir('multiblock-checks')
+    workingDir workDir
+    doFirst {
+        workDir.get().asFile.mkdirs()
+    }
+}
+
+tasks.named('check').configure {
+    dependsOn 'multiblockChecks'
+}

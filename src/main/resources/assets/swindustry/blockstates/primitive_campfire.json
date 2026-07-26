@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "stage=unlit": {
+      "model": "swindustry:block/primitive_campfire_unlit"
+    },
+    "stage=lit": {
+      "model": "swindustry:block/primitive_campfire_lit"
+    },
+    "stage=embers": {
+      "model": "swindustry:block/primitive_campfire_embers"
+    }
+  }
+}
