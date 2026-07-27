@@ -43,8 +43,16 @@ java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 def worldgenCoreProject = file("${rootDir}/../swgencore")
 def worldgenCoreJar = file("${worldgenCoreProject}/build/libs/${worldgen_core_mod_id}-1.0.0.jar")
 
+var buildWorldgenCore = tasks.register('buildWorldgenCore', Exec) {
+    group = 'sea worthy'
+    description = "Builds the sibling ${worldgen_core_mod_id} project for development runs."
+    workingDir worldgenCoreProject
+    commandLine 'cmd', '/c', 'gradlew.bat', 'build'
+}
+
 var installWorldgenCore = tasks.register('installWorldgenCore', Copy) {
     group = 'sea worthy'
+    dependsOn buildWorldgenCore
     description = "Copies the ${worldgen_core_mod_id} jar into run/mods so dev runs have the ocean dimension."
     from worldgenCoreJar
     into file("${projectDir}/run/mods")
