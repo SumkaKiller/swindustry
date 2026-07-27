@@ -26,12 +26,12 @@ public class ClayKilnScreen extends AbstractContainerScreen<ClayKilnMenu> {
     private static final int ARROW_V = 14;
 
     private static final int FIRE_X = 56;
-    private static final int FIRE_Y = 36;
+    private static final int FIRE_Y = 27;
     private static final int FIRE_WIDTH = 14;
     private static final int FIRE_HEIGHT = 14;
 
     private static final int ARROW_X = 79;
-    private static final int ARROW_Y = 34;
+    private static final int ARROW_Y = 29;
     private static final int ARROW_WIDTH = 24;
     private static final int ARROW_HEIGHT = 17;
 

@@ -72,9 +72,11 @@ public class ClayKilnMenu extends AbstractContainerMenu {
     }
 
     private void addKilnSlots() {
-        addSlot(new SlotItemHandler(kiln, ClayKilnBlockEntity.SLOT_INPUT, 56, 17));
-        addSlot(new SlotItemHandler(kiln, ClayKilnBlockEntity.SLOT_FUEL, 56, 53));
-        addSlot(new OutputSlot(kiln, ClayKilnBlockEntity.SLOT_OUTPUT, 116, 35));
+        // These coordinates follow the custom clay_kiln.png frame. The player inventory still uses
+        // the vanilla grid at the bottom of the sheet, while the kiln's own cells sit higher.
+        addSlot(new SlotItemHandler(kiln, ClayKilnBlockEntity.SLOT_INPUT, 56, 8));
+        addSlot(new SlotItemHandler(kiln, ClayKilnBlockEntity.SLOT_FUEL, 56, 49));
+        addSlot(new OutputSlot(kiln, ClayKilnBlockEntity.SLOT_OUTPUT, 116, 30));
     }
 
     private void addPlayerSlots(Inventory playerInventory) {
