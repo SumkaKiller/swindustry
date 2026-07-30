@@ -19,8 +19,6 @@
   "container.swindustry.clay_kiln": "Clay Kiln",
   "container.swindustry.clay_kiln.incomplete": "Kiln incomplete",
 
-  "hud.swindustry.objective": "OBJECTIVE %s/%s",
-
   "message.swindustry.need_strikers": "Hold flint in one hand and a stone in the other",
   "message.swindustry.kiln_incomplete": "Kiln incomplete: a block is missing at %s, %s, %s",
   "message.swindustry.kiln_incomplete_unknown": "Kiln incomplete",
@@ -53,6 +51,5 @@
   "swindustry.configuration.campfireBurnTicks": "Campfire burn duration in ticks",
   "swindustry.configuration.rainExtinguishes": "Rain puts the campfire out",
   "swindustry.configuration.kilnCookTicks": "Base kiln cook time in ticks",
-  "swindustry.configuration.kilnFuelEfficiency": "Fuel duration multiplier",
-  "swindustry.configuration.showProgressionHud": "Show the objective in the corner"
+  "swindustry.configuration.kilnFuelEfficiency": "Fuel duration multiplier"
 }

@@ -19,8 +19,6 @@
   "container.swindustry.clay_kiln": "Глиняная печь",
   "container.swindustry.clay_kiln.incomplete": "Печь не собрана",
 
-  "hud.swindustry.objective": "ЗАДАЧА %s/%s",
-
   "message.swindustry.need_strikers": "Возьмите кремень в одну руку и камень в другую",
   "message.swindustry.kiln_incomplete": "Печь не собрана: не хватает блока на %s, %s, %s",
   "message.swindustry.kiln_incomplete_unknown": "Печь не собрана",
@@ -53,6 +51,5 @@
   "swindustry.configuration.campfireBurnTicks": "Сколько горит костёр, тиков",
   "swindustry.configuration.rainExtinguishes": "Дождь тушит костёр",
   "swindustry.configuration.kilnCookTicks": "Базовое время плавки в печи, тиков",
-  "swindustry.configuration.kilnFuelEfficiency": "Множитель времени горения топлива",
-  "swindustry.configuration.showProgressionHud": "Показывать цель в углу экрана"
+  "swindustry.configuration.kilnFuelEfficiency": "Множитель времени горения топлива"
 }

@@ -57,13 +57,6 @@ public final class Config {
         .translation("swindustry.configuration.kilnFuelEfficiency")
         .defineInRange("kiln.fuelEfficiency", 1.0, 0.1, 10.0);
 
-    // ---- Progression hints --------------------------------------------------
-
-    public static final ModConfigSpec.BooleanValue SHOW_PROGRESSION_HUD = BUILDER
-        .comment("Shows the current objective in the top-right corner.")
-        .translation("swindustry.configuration.showProgressionHud")
-        .define("progression.showHud", true);
-
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private Config() {}
