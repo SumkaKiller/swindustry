@@ -4,20 +4,15 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
  * Common config. Everything a pack maker would want to retune without recompiling — how stubborn
- * the first fire is, how long it lasts, what it leaves behind — lives here rather than as a
- * constant buried in a block class.
+ * how long the first fire lasts and what it leaves behind — lives here rather than as a constant
+ * buried in a block class. The five-step ignition progression is defined by {@code CampfireIgnition}
+ * because it is gameplay logic rather than a pack tuning knob.
  */
 public final class Config {
 
     private static final ModConfigSpec.Builder BUILDER = new ModConfigSpec.Builder();
 
     // ---- Primitive campfire -------------------------------------------------
-
-    public static final ModConfigSpec.DoubleValue IGNITION_CHANCE = BUILDER
-        .comment("Chance that one strike of flint against stone lights the campfire.",
-            "The whole point of the opening is that fire is not a given, so this is deliberately low.")
-        .translation("swindustry.configuration.ignitionChance")
-        .defineInRange("campfire.ignitionChance", 0.30, 0.0, 1.0);
 
     public static final ModConfigSpec.IntValue STRIKE_COOLDOWN_TICKS = BUILDER
         .comment("Ticks between strikes. Stops a held right-click from rolling the dice 20 times a second.")

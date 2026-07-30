@@ -21,11 +21,13 @@ import net.minecraft.world.level.block.state.BlockState;
 public class PrimitiveCampfireBlockEntity extends BlockEntity {
 
     private static final String KEY_BURN_TICKS = "BurnTicks";
+    private static final String KEY_STRIKE_ATTEMPTS = "StrikeAttempts";
 
     /** How often the timer is written back to disk. Per-tick saving would be pure waste. */
     private static final int SAVE_INTERVAL = 20;
 
     private int burnTicks;
+    private final CampfireIgnition ignition = new CampfireIgnition();
 
     public PrimitiveCampfireBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.PRIMITIVE_CAMPFIRE.get(), pos, state);
@@ -34,7 +36,25 @@ public class PrimitiveCampfireBlockEntity extends BlockEntity {
     /** Starts the clock. Called the moment a strike catches. */
     public void onLit() {
         burnTicks = 0;
+        ignition.reset();
         setChanged();
+    }
+
+    /** Records a strike and returns its one-based attempt number. */
+    public int recordStrikeAttempt() {
+        int attempt = ignition.recordAttempt();
+        setChanged();
+        return attempt;
+    }
+
+    /** Clears failed-strike progress when the wood is cold again. */
+    public void resetStrikeAttempts() {
+        ignition.reset();
+        setChanged();
+    }
+
+    public int strikeAttempts() {
+        return ignition.attempts();
     }
 
     /** How far through its burn the fire is, 0 to 1. Drives nothing yet; useful for a gauge later. */
@@ -46,6 +66,7 @@ public class PrimitiveCampfireBlockEntity extends BlockEntity {
     public static void serverTick(Level level, BlockPos pos, BlockState state, PrimitiveCampfireBlockEntity campfire) {
         if (Config.RAIN_EXTINGUISHES_CAMPFIRE.get() && level.isRainingAt(pos.above())) {
             campfire.burnTicks = 0;
+            campfire.resetStrikeAttempts();
             level.setBlock(pos, state.setValue(PrimitiveCampfireBlock.STAGE, CampfireStage.UNLIT), Block.UPDATE_ALL);
             level.playSound(null, pos, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.6F, 1.0F);
             campfire.setChanged();
@@ -70,11 +91,16 @@ public class PrimitiveCampfireBlockEntity extends BlockEntity {
     protected void loadAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         burnTicks = tag.getInt(KEY_BURN_TICKS);
+        ignition.reset();
+        for (int i = 0; i < Math.min(CampfireIgnition.MAX_ATTEMPTS, tag.getInt(KEY_STRIKE_ATTEMPTS)); i++) {
+            ignition.recordAttempt();
+        }
     }
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.putInt(KEY_BURN_TICKS, burnTicks);
+        tag.putInt(KEY_STRIKE_ATTEMPTS, ignition.attempts());
     }
 }

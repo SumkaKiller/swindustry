@@ -44,8 +44,8 @@ import org.jetbrains.annotations.Nullable;
  * A heap of sticks and logs, and the first real obstacle of the game.
  *
  * <p>There is no flint and steel yet, so the only way to light it is to hold a piece of flint in
- * one hand and a stone in the other and strike them together over the wood. Most strikes come to
- * nothing. That is the point: fire has to be earned once before it becomes routine.</p>
+ * one hand and a stone in the other and strike them together over the wood. Each failed strike
+ * improves the next chance: 15%, 25%, 50%, 75%, then a guaranteed catch on the fifth strike.</p>
  *
  * <p>Once lit the fire is on a clock. It burns, it goes out on its own, and what is left is a heap
  * of embers holding the charcoal that everything after this depends on.</p>
@@ -201,7 +201,9 @@ public class PrimitiveCampfireBlock extends BaseEntityBlock {
         level.playSound(null, pos, SoundEvents.FLINTANDSTEEL_USE, SoundSource.BLOCKS,
             0.6F, 1.0F + (level.random.nextFloat() - 0.5F) * 0.3F);
 
-        if (level.random.nextDouble() < Config.IGNITION_CHANCE.get()) {
+        PrimitiveCampfireBlockEntity campfire = getCampfire(level, pos);
+        int attempt = campfire == null ? 1 : campfire.recordStrikeAttempt();
+        if (CampfireIgnition.succeeds(attempt, level.random.nextDouble())) {
             ignite(level, pos, state, player);
         } else if (level instanceof ServerLevel server) {
             // A failed strike still throws sparks, so the player can see the attempt landed.
@@ -211,6 +213,11 @@ public class PrimitiveCampfireBlock extends BaseEntityBlock {
                 pos.getX() + 0.5, pos.getY() + 0.4, pos.getZ() + 0.5, 2, 0.15, 0.05, 0.15, 0.0);
         }
         return ItemInteractionResult.CONSUME;
+    }
+
+    @Nullable
+    private static PrimitiveCampfireBlockEntity getCampfire(Level level, BlockPos pos) {
+        return level.getBlockEntity(pos) instanceof PrimitiveCampfireBlockEntity campfire ? campfire : null;
     }
 
     /**

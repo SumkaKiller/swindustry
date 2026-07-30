@@ -200,6 +200,14 @@ tasks.register('multiblockChecks', JavaExec) {
     }
 }
 
+tasks.register('campfireChecks', JavaExec) {
+    group = 'verification'
+    description = 'Verifies the five-step primitive campfire ignition progression.'
+    classpath = sourceSets.checks.runtimeClasspath
+    mainClass = 'com.jokerdayn.swindustry.checks.CampfireIgnitionCheck'
+    dependsOn checksClasses
+}
+
 tasks.named('check').configure {
-    dependsOn 'multiblockChecks'
+    dependsOn 'multiblockChecks', 'campfireChecks'
 }

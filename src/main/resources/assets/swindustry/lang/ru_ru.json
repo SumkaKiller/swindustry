@@ -45,7 +45,6 @@
   "swindustry.configuration.title": "SW: Промышленность",
   "swindustry.configuration.section.swindustry.common.toml": "SW: Промышленность",
   "swindustry.configuration.section.swindustry.common.toml.title": "SW: Промышленность",
-  "swindustry.configuration.ignitionChance": "Шанс поджечь костёр одним ударом",
   "swindustry.configuration.strikeCooldown": "Задержка между ударами, тиков",
   "swindustry.configuration.requireDistinctStrikers": "Нужны именно кремень и камень",
   "swindustry.configuration.campfireBurnTicks": "Сколько горит костёр, тиков",

@@ -75,7 +75,7 @@ blocks that are no longer there.
 
 | | |
 |---|---|
-| `primitive_campfire` | sticks and logs. Strike flint against stone over it: 30% a strike catches. Burns for 60 s, then leaves embers holding 1–5 charcoal and 1–3 soot. |
+| `primitive_campfire` | sticks and logs. Strike flint against stone over it: 15%, 25%, 50%, 75%, then 100% on the fifth strike. Burns for 60 s, then leaves embers holding 1–5 charcoal and 1–3 soot. |
 | `raw_clay_bricks` | the kiln's shell, tagged `swindustry:kiln_wall` |
 | `clay_kiln_port` | the kiln's mouth and its controller |
 | `soot` | deliberately useless, for now |
@@ -94,8 +94,8 @@ sitting in, and be visibly refused until the shell is rebuilt.
 
 ## Numbers worth tuning
 
-Most balance lives in `swindustry-common.toml` (ignition chance, burn time, fuel efficiency, cook
-time). Two that do not, and that are the most likely to want changing after a playtest:
+Most balance lives in `swindustry-common.toml` (burn time, fuel efficiency, and cook time). Two
+datapack-driven values are the most likely to want changing after a playtest:
 
 - **`data/swindustry/recipe/raw_clay_bricks.json`** — four clay balls make two brick blocks, so a
   full kiln costs about 102 clay balls. Beach clay is scarce: `SurfacePalette` in SW: Worldgen Core
