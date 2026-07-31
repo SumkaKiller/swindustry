@@ -54,7 +54,8 @@ public final class MultiblockPatterns {
                 if (!level.isLoaded(candidate)) {
                     continue;
                 }
-                if (level.getBlockEntity(candidate) instanceof MultiblockControllerEntity controller) {
+                if (level.getBlockEntity(candidate) instanceof MultiblockControllerEntity controller
+                    && controller.structurePattern() == pattern) {
                     controller.invalidateStructure();
                 }
             }

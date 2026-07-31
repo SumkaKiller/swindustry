@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
-    "swindustry:primitive_campfire"
+    "swindustry:primitive_campfire",
+    "swindustry:drafting_table"
   ]
 }

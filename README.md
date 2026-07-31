@@ -78,8 +78,30 @@ blocks that are no longer there.
 | `primitive_campfire` | sticks and logs. Strike flint against stone over it: 15%, 25%, 50%, 75%, then 100% on the fifth strike. Burns for 60 s, then leaves embers holding 1–5 charcoal and 1–3 soot. |
 | `raw_clay_bricks` | the kiln's shell, tagged `swindustry:kiln_wall` |
 | `clay_kiln_port` | the kiln's mouth and its controller |
-| `soot` | deliberately useless, for now |
+| `drafting_table` | paper, soot ink and a reusable controller sample become a machine blueprint |
+| primitive engineer's goggles | an early wooden sighting frame that projects the selected blueprint layer by layer |
+| clay kiln blueprint | reusable plan; clips into worn or held goggles without being consumed |
+| `soot` | campfire residue and the drafting table's first ink |
 | bronze tools and armour | tier between stone and iron, but with iron's mining level — see `ModToolTiers` |
+
+Vanilla boats, rafts and their chest variants are deliberately recipe-disabled. They remain valid
+entities for maps and commands, but ordinary planks cannot bypass the pack's shipbuilding
+progression.
+
+### The blueprint loop happens before the first firing
+
+The island's sugar cane closes the only early-material gap: three cane can be twisted into one
+string. Sticks, paper and that cordage make the primitive goggles without glass or metal. They are a
+wooden sighting frame, not armour and not impossible pre-kiln optics.
+
+Once the first campfire leaves soot, the drafting table takes one paper, one soot and a kiln loading
+port as its sample. Paper and soot are spent; the expensive port is returned untouched. The result
+is a reusable blueprint. Wear the goggles and use the blueprint (or combine both in a crafting
+grid) to install it, then sneak-use the matching controller.
+
+The projection sweeps upward one layer at a time and is sent only to the inspecting player: green
+marks correct walls, cyan marks blocks to place, and red marks cavities that must be cleared.
+Walking away, logging out or starting another inspection cleans it up automatically.
 
 The clay kiln is `KilnPatterns.CLAY_KILN`: 43 bricks and a loading port, taken block for block from
 `furnace.nbt`. A 3×3×2 firebox with the corners knocked off, drawing in to a throat and a

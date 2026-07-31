@@ -9,13 +9,14 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ArmorMaterial;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 /**
- * Bronze plate.
+ * Wearable materials: a zero-armour wooden sighting frame and bronze plate.
  *
  * <p>Sits between chainmail and iron: one point better than chain across the body, one short of
  * iron everywhere, and rather less hard-wearing than either. Good enough to survive the island,
@@ -35,6 +36,27 @@ public final class ModArmorMaterials {
 
     /** Multiplier on each slot's base durability. Iron is 15. */
     public static final int BRONZE_DURABILITY = 13;
+    public static final int GOGGLES_DURABILITY = 5;
+
+    /** A wearable wooden frame, not armour: it deliberately grants no protection. */
+    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> ENGINEER_GOGGLES = ARMOR_MATERIALS.register(
+        "engineer_goggles",
+        () -> new ArmorMaterial(
+            Util.make(new EnumMap<>(ArmorItem.Type.class), defense -> {
+                defense.put(ArmorItem.Type.BOOTS, 0);
+                defense.put(ArmorItem.Type.LEGGINGS, 0);
+                defense.put(ArmorItem.Type.CHESTPLATE, 0);
+                defense.put(ArmorItem.Type.HELMET, 0);
+                defense.put(ArmorItem.Type.BODY, 0);
+            }),
+            0,
+            SoundEvents.ARMOR_EQUIP_LEATHER,
+            () -> Ingredient.of(Items.STRING),
+            List.of(new ArmorMaterial.Layer(SWIndustry.id("engineer_goggles"))),
+            0.0F,
+            0.0F
+        )
+    );
 
     public static final DeferredHolder<ArmorMaterial, ArmorMaterial> BRONZE = ARMOR_MATERIALS.register(
         "bronze",
@@ -61,6 +83,10 @@ public final class ModArmorMaterials {
 
     public static Holder<ArmorMaterial> bronze() {
         return BRONZE;
+    }
+
+    public static Holder<ArmorMaterial> engineerGoggles() {
+        return ENGINEER_GOGGLES;
     }
 
     public static void register(IEventBus modEventBus) {

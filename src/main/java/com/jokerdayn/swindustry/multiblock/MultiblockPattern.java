@@ -71,6 +71,12 @@ public final class MultiblockPattern {
     private static final Direction[] HORIZONTALS =
         {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
 
+    private enum CellResult {
+        MATCH,
+        MISMATCH,
+        CHUNK_UNAVAILABLE
+    }
+
     private MultiblockPattern(char[][][] grid, Map<Character, BlockMatcher> matchers,
                               char controllerChar, Vec3i controllerCell) {
         this.matchers = Map.copyOf(matchers);
@@ -157,14 +163,35 @@ public final class MultiblockPattern {
      * @return the formed machine, or empty if any cell disagrees
      */
     public Optional<MultiblockInstance> match(LevelReader level, BlockPos controllerPos, Direction facing) {
+        return evaluate(level, controllerPos, facing).instance();
+    }
+
+    /**
+     * Tests the pattern while preserving the difference between a known mismatch and a cell whose
+     * chunk is not loaded. Controllers use that distinction to pause instead of destroying work
+     * merely because a neighbouring chunk crossed the load boundary.
+     */
+    public MatchResult evaluate(LevelReader level, BlockPos controllerPos, Direction facing) {
         requireHorizontal(facing);
+
+        CellResult controllerResult = testCell(level, controllerPos, Vec3i.ZERO);
+        if (controllerResult == CellResult.CHUNK_UNAVAILABLE) {
+            return new MatchResult(false, Optional.empty());
+        }
+        if (controllerResult == CellResult.MISMATCH) {
+            return new MatchResult(true, Optional.empty());
+        }
 
         Set<BlockPos> walls = new LinkedHashSet<>(wallOffsets.size() + 1);
         walls.add(controllerPos);
         for (Vec3i offset : wallOffsets) {
             BlockPos pos = toWorld(controllerPos, facing, offset);
-            if (!accepts(level, pos, offset)) {
-                return Optional.empty();
+            CellResult result = testCell(level, pos, offset);
+            if (result == CellResult.CHUNK_UNAVAILABLE) {
+                return new MatchResult(false, Optional.empty());
+            }
+            if (result == CellResult.MISMATCH) {
+                return new MatchResult(true, Optional.empty());
             }
             walls.add(pos);
         }
@@ -172,14 +199,19 @@ public final class MultiblockPattern {
         Set<BlockPos> cavity = new LinkedHashSet<>(cavityOffsets.size());
         for (Vec3i offset : cavityOffsets) {
             BlockPos pos = toWorld(controllerPos, facing, offset);
-            if (!accepts(level, pos, offset)) {
-                return Optional.empty();
+            CellResult result = testCell(level, pos, offset);
+            if (result == CellResult.CHUNK_UNAVAILABLE) {
+                return new MatchResult(false, Optional.empty());
+            }
+            if (result == CellResult.MISMATCH) {
+                return new MatchResult(true, Optional.empty());
             }
             cavity.add(pos);
         }
 
-        return Optional.of(new MultiblockInstance(controllerPos, facing,
-            Collections.unmodifiableSet(walls), Collections.unmodifiableSet(cavity)));
+        MultiblockInstance instance = new MultiblockInstance(controllerPos, facing,
+            Collections.unmodifiableSet(walls), Collections.unmodifiableSet(cavity));
+        return new MatchResult(true, Optional.of(instance));
     }
 
     /**
@@ -187,37 +219,73 @@ public final class MultiblockPattern {
      * player should be told about. Returns empty when the whole pattern already matches.
      */
     public Optional<Mismatch> firstMismatch(LevelReader level, BlockPos controllerPos, Direction facing) {
+        List<Mismatch> mismatches = mismatches(level, controllerPos, facing, 1);
+        return mismatches.isEmpty() ? Optional.empty() : Optional.of(mismatches.getFirst());
+    }
+
+    /** Every wrong wall or cavity cell, in authored build order. Non-positive {@code limit} means all. */
+    public List<Mismatch> mismatches(LevelReader level, BlockPos controllerPos, Direction facing, int limit) {
+        List<Mismatch> problems = new ArrayList<>();
+        for (InspectionCell cell : inspect(level, controllerPos, facing)) {
+            if (!cell.matches()) {
+                problems.add(new Mismatch(cell.pos(), cell.symbol(), cell.expected()));
+                if (limit > 0 && problems.size() >= limit) {
+                    break;
+                }
+            }
+        }
+        return List.copyOf(problems);
+    }
+
+    /**
+     * Resolves every meaningful pattern cell into world space for blueprint previews and detailed
+     * diagnostics. Ignored padding never appears in the returned list.
+     */
+    public List<InspectionCell> inspect(LevelReader level, BlockPos controllerPos, Direction facing) {
         requireHorizontal(facing);
-        for (Vec3i offset : wallOffsets) {
-            BlockPos pos = toWorld(controllerPos, facing, offset);
-            if (!accepts(level, pos, offset)) {
-                return Optional.of(new Mismatch(pos, cells.get(offset), matchers.get(cells.get(offset))));
+        List<InspectionCell> inspection = new ArrayList<>(wallOffsets.size() + cavityOffsets.size() + 1);
+        cells.forEach((offset, symbol) -> {
+            BlockMatcher matcher = matchers.get(symbol);
+            if (matcher.role() == BlockMatcher.Role.IGNORED) {
+                return;
             }
-        }
-        for (Vec3i offset : cavityOffsets) {
             BlockPos pos = toWorld(controllerPos, facing, offset);
-            if (!accepts(level, pos, offset)) {
-                return Optional.of(new Mismatch(pos, cells.get(offset), matchers.get(cells.get(offset))));
-            }
-        }
-        return Optional.empty();
+            inspection.add(new InspectionCell(pos, symbol, matcher, accepts(level, pos, offset)));
+        });
+        return List.copyOf(inspection);
     }
 
     /** One cell that failed to match, and what was expected there. */
     public record Mismatch(BlockPos pos, char symbol, BlockMatcher expected) {}
+
+    /** One resolved blueprint cell and whether the world currently satisfies it. */
+    public record InspectionCell(BlockPos pos, char symbol, BlockMatcher expected, boolean matches) {}
+
+    /**
+     * Result of a structure check. An inconclusive result means an unloaded chunk was reached
+     * before either a complete match or a definite mismatch could be established.
+     */
+    public record MatchResult(boolean conclusive, Optional<MultiblockInstance> instance) {}
 
     // hasChunkAt is one of Mojang's "know what you are doing" deprecations rather than a removal
     // notice, and knowing what is loaded is exactly the question here: reading a block out of an
     // unloaded chunk would drag it into memory, and getBlockState would happily answer "air".
     @SuppressWarnings("deprecation")
     private boolean accepts(LevelReader level, BlockPos pos, Vec3i offset) {
-        // A machine reaching into unloaded chunks is neither formed nor broken. Refusing to form is
-        // the safe answer, because guessing would let it run on blocks nobody has read.
+        return testCell(level, pos, offset) == CellResult.MATCH;
+    }
+
+    @SuppressWarnings("deprecation")
+    private CellResult testCell(LevelReader level, BlockPos pos, Vec3i offset) {
+        // A machine reaching into unloaded chunks is neither formed nor broken. Report that third
+        // state so its controller can pause without trusting or discarding an unread structure.
         if (!level.hasChunkAt(pos)) {
-            return false;
+            return CellResult.CHUNK_UNAVAILABLE;
         }
         BlockState state = level.getBlockState(pos);
-        return matchers.get(cells.get(offset)).matches(level, pos, state);
+        return matchers.get(cells.get(offset)).matches(level, pos, state)
+            ? CellResult.MATCH
+            : CellResult.MISMATCH;
     }
 
     /**
@@ -248,7 +316,7 @@ public final class MultiblockPattern {
      * entries are only <em>candidates</em>: the caller still has to check what is actually there.</p>
      */
     public List<BlockPos> candidateControllerPositions(BlockPos memberPos) {
-        List<BlockPos> candidates = new ArrayList<>(wallOffsets.size() * 4 + 1);
+        Set<BlockPos> candidates = new LinkedHashSet<>(wallOffsets.size() * 4 + 1);
         candidates.add(memberPos.immutable());
         for (Direction facing : HORIZONTALS) {
             for (Vec3i offset : wallOffsets) {
@@ -257,7 +325,7 @@ public final class MultiblockPattern {
                 candidates.add(memberPos.subtract(rotated));
             }
         }
-        return candidates;
+        return List.copyOf(candidates);
     }
 
     /**

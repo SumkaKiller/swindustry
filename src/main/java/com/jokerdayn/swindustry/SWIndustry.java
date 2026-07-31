@@ -4,6 +4,7 @@ import com.jokerdayn.swindustry.registry.ModArmorMaterials;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
 import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.jokerdayn.swindustry.registry.ModCreativeTabs;
+import com.jokerdayn.swindustry.registry.ModDataComponents;
 import com.jokerdayn.swindustry.registry.ModItems;
 import com.jokerdayn.swindustry.registry.ModMenus;
 import com.jokerdayn.swindustry.registry.ModRecipes;
@@ -35,6 +36,7 @@ public class SWIndustry {
     public static final String WORLDGEN_CORE = "swworldgencore";
 
     public SWIndustry(IEventBus modEventBus, ModContainer modContainer) {
+        ModDataComponents.register(modEventBus);
         ModBlocks.register(modEventBus);
         ModItems.register(modEventBus);
         ModBlockEntities.register(modEventBus);

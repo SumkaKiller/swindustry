@@ -7,7 +7,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
-/** Client-only wiring for the kiln screen. */
+/** Client-only wiring for workstation screens. */
 public final class SWIndustryClient {
 
     private SWIndustryClient() {}
@@ -20,6 +20,7 @@ public final class SWIndustryClient {
         @SubscribeEvent
         public static void registerScreens(RegisterMenuScreensEvent event) {
             event.register(ModMenus.CLAY_KILN.get(), ClayKilnScreen::new);
+            event.register(ModMenus.DRAFTING_TABLE.get(), DraftingTableScreen::new);
         }
     }
 

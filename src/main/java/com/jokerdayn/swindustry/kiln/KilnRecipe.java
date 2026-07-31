@@ -97,9 +97,12 @@ public record KilnRecipe(
         private static final MapCodec<KilnRecipe> CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
             Ingredient.CODEC_NONEMPTY.fieldOf("ingredient").forGetter(KilnRecipe::ingredient),
             ItemStack.STRICT_CODEC.fieldOf("result").forGetter(KilnRecipe::result),
-            Codec.FLOAT.optionalFieldOf("experience", 0.0F).forGetter(KilnRecipe::experience),
-            Codec.INT.optionalFieldOf("cookingtime", DEFAULT_COOKING_TIME).forGetter(KilnRecipe::cookingTime),
-            Codec.INT.optionalFieldOf("tier", TIER_CLAY).forGetter(KilnRecipe::minTier)
+            Codec.floatRange(0.0F, Float.MAX_VALUE).optionalFieldOf("experience", 0.0F)
+                .forGetter(KilnRecipe::experience),
+            Codec.intRange(1, Integer.MAX_VALUE).optionalFieldOf("cookingtime", DEFAULT_COOKING_TIME)
+                .forGetter(KilnRecipe::cookingTime),
+            Codec.intRange(TIER_CLAY, Integer.MAX_VALUE).optionalFieldOf("tier", TIER_CLAY)
+                .forGetter(KilnRecipe::minTier)
         ).apply(instance, KilnRecipe::new));
 
         private static final StreamCodec<RegistryFriendlyByteBuf, KilnRecipe> STREAM_CODEC =

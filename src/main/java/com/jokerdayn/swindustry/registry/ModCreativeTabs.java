@@ -23,8 +23,11 @@ public final class ModCreativeTabs {
             .displayItems((parameters, output) -> {
                 output.accept(ModItems.PRIMITIVE_CAMPFIRE.get());
                 output.accept(ModItems.SOOT.get());
+                output.accept(ModItems.PRIMITIVE_ENGINEER_GOGGLES.get());
                 output.accept(ModItems.RAW_CLAY_BRICKS.get());
                 output.accept(ModItems.CLAY_KILN_PORT.get());
+                output.accept(ModItems.DRAFTING_TABLE.get());
+                output.accept(ModItems.CLAY_KILN_BLUEPRINT.get());
                 output.accept(ModItems.BRONZE_SWORD.get());
                 output.accept(ModItems.BRONZE_PICKAXE.get());
                 output.accept(ModItems.BRONZE_AXE.get());

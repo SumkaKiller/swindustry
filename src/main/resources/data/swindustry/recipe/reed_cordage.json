@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "CCC"
+  ],
+  "key": {
+    "C": {
+      "item": "minecraft:sugar_cane"
+    }
+  },
+  "result": {
+    "id": "minecraft:string",
+    "count": 1
+  }
+}
