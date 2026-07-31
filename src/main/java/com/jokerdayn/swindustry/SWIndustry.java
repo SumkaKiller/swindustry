@@ -1,9 +1,6 @@
 package com.jokerdayn.swindustry;
 
-import com.jokerdayn.swindustry.progression.ProgressionEvents;
-import com.jokerdayn.swindustry.progression.ProgressionNetwork;
 import com.jokerdayn.swindustry.registry.ModArmorMaterials;
-import com.jokerdayn.swindustry.registry.ModAttachments;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
 import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.jokerdayn.swindustry.registry.ModCreativeTabs;
@@ -16,7 +13,6 @@ import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
-import net.neoforged.neoforge.common.NeoForge;
 import org.slf4j.Logger;
 
 /**
@@ -45,11 +41,7 @@ public class SWIndustry {
         ModMenus.register(modEventBus);
         ModRecipes.register(modEventBus);
         ModArmorMaterials.register(modEventBus);
-        ModAttachments.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
-
-        modEventBus.addListener(ProgressionNetwork::register);
-        NeoForge.EVENT_BUS.register(ProgressionEvents.class);
 
         modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
     }

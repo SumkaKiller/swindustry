@@ -3,8 +3,6 @@ package com.jokerdayn.swindustry.kiln;
 import com.jokerdayn.swindustry.Config;
 import com.jokerdayn.swindustry.multiblock.MultiblockControllerEntity;
 import com.jokerdayn.swindustry.multiblock.MultiblockPattern;
-import com.jokerdayn.swindustry.progression.ProgressionEvents;
-import com.jokerdayn.swindustry.progression.ProgressionMilestone;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
 import com.jokerdayn.swindustry.registry.ModRecipes;
 import java.util.Optional;
@@ -384,16 +382,6 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         Containers.dropContents(level, worldPosition, contents);
     }
 
-    /**
-     * Records that this player has a working kiln.
-     *
-     * <p>Tied to opening the kiln rather than to it assembling, because a kiln that snapped
-     * together because someone else finished the wall is not this player's achievement.</p>
-     */
-    public void onOpenedBy(Player player) {
-        ProgressionEvents.record(player, ProgressionMilestone.FORMED_A_KILN);
-    }
-
     // ------------------------------------------------------------------
     // Menu
     // ------------------------------------------------------------------
@@ -406,7 +394,6 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     @Nullable
     @Override
     public AbstractContainerMenu createMenu(int containerId, Inventory playerInventory, Player player) {
-        onOpenedBy(player);
         return new ClayKilnMenu(containerId, playerInventory, items, dataAccess, this);
     }
 

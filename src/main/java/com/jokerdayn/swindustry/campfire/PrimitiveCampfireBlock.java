@@ -1,8 +1,6 @@
 package com.jokerdayn.swindustry.campfire;
 
 import com.jokerdayn.swindustry.Config;
-import com.jokerdayn.swindustry.progression.ProgressionEvents;
-import com.jokerdayn.swindustry.progression.ProgressionMilestone;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
 import com.jokerdayn.swindustry.registry.ModTags;
 import com.mojang.serialization.MapCodec;
@@ -255,7 +253,6 @@ public class PrimitiveCampfireBlock extends BaseEntityBlock {
         if (level.getBlockEntity(pos) instanceof PrimitiveCampfireBlockEntity campfire) {
             campfire.onLit();
         }
-        ProgressionEvents.record(player, ProgressionMilestone.LIT_A_FIRE);
     }
 
     // ------------------------------------------------------------------
