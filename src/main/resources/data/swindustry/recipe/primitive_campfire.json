@@ -3,8 +3,8 @@
   "category": "misc",
   "pattern": [
     " S ",
-    "SLS",
-    " L "
+    "S S",
+    "LLL"
   ],
   "key": {
     "S": {
