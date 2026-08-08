@@ -77,6 +77,20 @@ public final class MultiblockPattern {
         CHUNK_UNAVAILABLE
     }
 
+    /**
+     * Creates an immutable multiblock pattern from a 3D grid and a character-to-matcher mapping table.
+     *
+     * @param grid           3D character grid where indices are [y][z][x]
+     * @param matchers       character to block matcher lookup map
+     * @param controllerChar character representing the controller anchor
+     * @param controllerCell position (x, y, z) of the controller in the grid
+     * @return constructed MultiblockPattern instance
+     */
+    public static MultiblockPattern of(char[][][] grid, Map<Character, BlockMatcher> matchers,
+                                       char controllerChar, Vec3i controllerCell) {
+        return new MultiblockPattern(grid, matchers, controllerChar, controllerCell);
+    }
+
     private MultiblockPattern(char[][][] grid, Map<Character, BlockMatcher> matchers,
                               char controllerChar, Vec3i controllerCell) {
         this.matchers = Map.copyOf(matchers);

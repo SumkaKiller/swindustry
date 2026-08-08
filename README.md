@@ -20,9 +20,19 @@ first and the machines are written on top of it.
 
 ### Declaring a shape
 
-A `MultiblockPattern` is a stack of layer strings plus a character-to-matcher table. Layers go
-bottom-up; inside a layer each string is one row along **+Z**, and each character steps along
-**+X** — so a layer reads like a map with north at the top.
+A `MultiblockPattern` can be loaded directly from an exported in-game structure template (`.nbt`) via `StructurePatternLoader` (recommended for medium and large multiblocks) or declared via layer strings with `MultiblockPattern.builder()`.
+
+```java
+// Loaded directly from an in-game Structure Block template (.nbt)
+public static final MultiblockPattern CLAY_KILN = MultiblockPatterns.register(
+    StructurePatternLoader.builder()
+        .fromResource(SWIndustry.id("structures/clay_kiln.nbt"))
+        .map(ModBlocks.RAW_CLAY_BRICKS, BlockMatcher.tag(ModTags.Blocks.KILN_WALL))
+        .controller(ModBlocks.CLAY_KILN_PORT)
+        .build());
+```
+
+Alternatively, smaller 3x3 machines can still be authored via matrix layers:
 
 ```java
 public static final MultiblockPattern MY_MACHINE = MultiblockPatterns.register(

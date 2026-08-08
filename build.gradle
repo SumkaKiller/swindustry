@@ -232,6 +232,14 @@ tasks.register('stage1ProgressionChecks', JavaExec) {
     dependsOn checksClasses
 }
 
+tasks.register('structurePatternChecks', JavaExec) {
+    group = 'verification'
+    description = 'Verifies NBT structure multiblock loader, tag mappings, and round-trip export.'
+    classpath = sourceSets.checks.runtimeClasspath
+    mainClass = 'com.jokerdayn.swindustry.checks.StructurePatternCheck'
+    dependsOn checksClasses
+}
+
 tasks.named('check').configure {
-    dependsOn 'multiblockChecks', 'campfireChecks', 'guiTextureChecks', 'blueprintChecks', 'stage1ProgressionChecks'
+    dependsOn 'multiblockChecks', 'campfireChecks', 'guiTextureChecks', 'blueprintChecks', 'stage1ProgressionChecks', 'structurePatternChecks'
 }

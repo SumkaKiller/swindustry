@@ -1,8 +1,10 @@
 package com.jokerdayn.swindustry.kiln;
 
+import com.jokerdayn.swindustry.SWIndustry;
 import com.jokerdayn.swindustry.multiblock.BlockMatcher;
 import com.jokerdayn.swindustry.multiblock.MultiblockPattern;
 import com.jokerdayn.swindustry.multiblock.MultiblockPatterns;
+import com.jokerdayn.swindustry.multiblock.StructurePatternLoader;
 import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.jokerdayn.swindustry.registry.ModTags;
 
@@ -37,51 +39,9 @@ public final class KilnPatterns {
      * apart on the spot rather than a second later.</p>
      */
     public static final MultiblockPattern CLAY_KILN = MultiblockPatterns.register(
-        MultiblockPattern.builder()
-            // y = 0 — firebox floor course, with the loading port set into the front wall
-            .layer(
-                " CPC ",
-                "C___C",
-                "C___C",
-                "C___C",
-                " CCC ")
-            // y = 1 — second course of the firebox
-            .layer(
-                " CCC ",
-                "C___C",
-                "C___C",
-                "C___C",
-                " CCC ")
-            // y = 2 — the throat, drawing the fire in towards the flue
-            .layer(
-                "     ",
-                " CCC ",
-                " C_C ",
-                " CCC ",
-                "     ")
-            // y = 3..5 — the flue
-            .layer(
-                "     ",
-                "  C  ",
-                " C_C ",
-                "  C  ",
-                "     ")
-            .layer(
-                "     ",
-                "  C  ",
-                " C_C ",
-                "  C  ",
-                "     ")
-            .layer(
-                "     ",
-                "  C  ",
-                " C_C ",
-                "  C  ",
-                "     ")
-            .where('C', BlockMatcher.tag(ModTags.Blocks.KILN_WALL))
-            .where('P', BlockMatcher.block(ModBlocks.CLAY_KILN_PORT))
-            .where('_', BlockMatcher.cavity())
-            .where(' ', BlockMatcher.ignored())
-            .controller('P')
+        StructurePatternLoader.builder()
+            .fromResource(SWIndustry.id("structures/clay_kiln.nbt"))
+            .map(ModBlocks.RAW_CLAY_BRICKS, BlockMatcher.tag(ModTags.Blocks.KILN_WALL))
+            .controller(ModBlocks.CLAY_KILN_PORT)
             .build());
 }

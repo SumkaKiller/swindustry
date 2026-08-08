@@ -28,6 +28,7 @@ public final class MultiblockBlueprintItem extends Item {
         this.blueprintId = blueprintId;
     }
 
+    /** Returns the unique identifier of the multiblock blueprint represented by this item. */
     public ResourceLocation blueprintId() {
         return blueprintId;
     }
