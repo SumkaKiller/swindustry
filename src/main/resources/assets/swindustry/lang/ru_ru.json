@@ -55,7 +55,7 @@
   "item.swindustry.primitive_engineer_goggles.empty": "Чертёж не установлен",
   "item.swindustry.primitive_engineer_goggles.loaded": "Установлен чертёж: %s",
   "item.swindustry.primitive_engineer_goggles.early_frame": "Деревянная визирная рамка — не броня",
-  "item.swindustry.primitive_engineer_goggles.use_hint": "ПКМ по контроллеру в руке или крадучись в очках",
+  "item.swindustry.primitive_engineer_goggles.use_hint": "Наденьте, чтобы видеть разметку структур",
   "item.swindustry.primitive_engineer_goggles.legend": "Зелёный: верно · голубой: поставить · красный: убрать",
 
   "message.swindustry.need_strikers": "Возьмите кремень в одну руку и камень в другую",

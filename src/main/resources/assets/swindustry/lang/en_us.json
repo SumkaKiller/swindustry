@@ -55,7 +55,7 @@
   "item.swindustry.primitive_engineer_goggles.empty": "No blueprint installed",
   "item.swindustry.primitive_engineer_goggles.loaded": "Installed plan: %s",
   "item.swindustry.primitive_engineer_goggles.early_frame": "Wooden sighting frame — not armour",
-  "item.swindustry.primitive_engineer_goggles.use_hint": "Use on a controller, or wear and sneak-use it",
+  "item.swindustry.primitive_engineer_goggles.use_hint": "Wear to visualize multiblock structure outlines",
   "item.swindustry.primitive_engineer_goggles.legend": "Green: correct · cyan: place · red: clear",
 
   "message.swindustry.need_strikers": "Hold flint in one hand and a stone in the other",

@@ -1,19 +1,14 @@
 package com.jokerdayn.swindustry.item;
 
-import com.jokerdayn.swindustry.blueprint.MultiblockBlueprints;
-import com.jokerdayn.swindustry.blueprint.MultiblockProjectionManager;
 import com.jokerdayn.swindustry.multiblock.BlockMatcher;
 import com.jokerdayn.swindustry.multiblock.MultiblockControllerEntity;
 import com.jokerdayn.swindustry.multiblock.MultiblockPattern;
 import com.jokerdayn.swindustry.registry.ModArmorMaterials;
-import com.jokerdayn.swindustry.registry.ModDataComponents;
 import com.jokerdayn.swindustry.registry.ModItems;
 import java.util.List;
-import java.util.Optional;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -25,19 +20,23 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 
-/** Wearable early-game goggles that project the reusable blueprint clipped into them. */
+/** Wearable early-game sighting frame that visualizes incomplete multiblock structures. */
 public final class PrimitiveEngineerGogglesItem extends ArmorItem {
 
     public PrimitiveEngineerGogglesItem(Properties properties) {
         super(ModArmorMaterials.engineerGoggles(), Type.HELMET, properties);
     }
 
-    public static void selectBlueprint(ItemStack goggles, ResourceLocation blueprintId) {
-        goggles.set(ModDataComponents.SELECTED_BLUEPRINT.get(), blueprintId);
+    /** Checks if the player has engineer goggles equipped on head. */
+    public static boolean isWearingGoggles(Player player) {
+        return player.getItemBySlot(EquipmentSlot.HEAD).is(ModItems.PRIMITIVE_ENGINEER_GOGGLES.get());
     }
 
-    public static Optional<ResourceLocation> selectedBlueprint(ItemStack goggles) {
-        return Optional.ofNullable(goggles.get(ModDataComponents.SELECTED_BLUEPRINT.get()));
+    /** Checks if the player has engineer goggles equipped on head or held in either hand. */
+    public static boolean isHoldingOrWearingGoggles(Player player) {
+        return isWearingGoggles(player)
+            || player.getMainHandItem().is(ModItems.PRIMITIVE_ENGINEER_GOGGLES.get())
+            || player.getOffhandItem().is(ModItems.PRIMITIVE_ENGINEER_GOGGLES.get());
     }
 
     @Override
@@ -65,25 +64,6 @@ public final class PrimitiveEngineerGogglesItem extends ArmorItem {
 
     private static InteractionResult inspect(Player player, ItemStack goggles,
                                              MultiblockControllerEntity controller) {
-        Optional<ResourceLocation> selected = selectedBlueprint(goggles);
-        if (selected.isEmpty()) {
-            player.displayClientMessage(
-                Component.translatable("message.swindustry.goggles.no_blueprint"), true);
-            return InteractionResult.CONSUME;
-        }
-
-        Optional<MultiblockBlueprints.Definition> definition = MultiblockBlueprints.byId(selected.get());
-        if (definition.isEmpty()) {
-            player.displayClientMessage(
-                Component.translatable("message.swindustry.goggles.unknown_blueprint"), true);
-            return InteractionResult.CONSUME;
-        }
-        if (!definition.get().matches(controller)) {
-            player.displayClientMessage(Component.translatable(
-                "message.swindustry.goggles.wrong_controller", definition.get().name()), true);
-            return InteractionResult.CONSUME;
-        }
-
         Direction facing = controller.structureFacing();
         if (facing == null || facing.getAxis().isVertical()
             || !(player instanceof ServerPlayer serverPlayer)) {
@@ -99,7 +79,6 @@ public final class PrimitiveEngineerGogglesItem extends ArmorItem {
                 Component.translatable("message.swindustry.goggles.cannot_inspect"), true);
             return InteractionResult.CONSUME;
         }
-        MultiblockProjectionManager.show(serverPlayer, controller.getBlockPos(), inspection);
 
         int wallCells = 0;
         int correctWalls = 0;
@@ -130,26 +109,11 @@ public final class PrimitiveEngineerGogglesItem extends ArmorItem {
     @Override
     public void appendHoverText(ItemStack stack, TooltipContext context,
                                 List<Component> tooltipComponents, TooltipFlag tooltipFlag) {
-        Optional<Component> blueprintName = selectedBlueprint(stack)
-            .flatMap(MultiblockBlueprints::byId)
-            .map(MultiblockBlueprints.Definition::name);
-        if (blueprintName.isPresent()) {
-            tooltipComponents.add(Component.translatable(
-                "item.swindustry.primitive_engineer_goggles.loaded", blueprintName.get())
-                .withStyle(ChatFormatting.AQUA));
-        } else {
-            tooltipComponents.add(Component.translatable(
-                "item.swindustry.primitive_engineer_goggles.empty")
-                .withStyle(ChatFormatting.GRAY));
-        }
         tooltipComponents.add(Component.translatable(
             "item.swindustry.primitive_engineer_goggles.early_frame")
             .withStyle(ChatFormatting.GRAY));
         tooltipComponents.add(Component.translatable(
             "item.swindustry.primitive_engineer_goggles.use_hint")
-            .withStyle(ChatFormatting.DARK_GRAY));
-        tooltipComponents.add(Component.translatable(
-            "item.swindustry.primitive_engineer_goggles.legend")
-            .withStyle(ChatFormatting.DARK_GRAY));
+            .withStyle(ChatFormatting.AQUA));
     }
 }
