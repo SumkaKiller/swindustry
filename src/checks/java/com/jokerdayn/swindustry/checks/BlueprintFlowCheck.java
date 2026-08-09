@@ -19,7 +19,7 @@ import net.minecraft.SharedConstants;
 import net.minecraft.server.Bootstrap;
 import net.neoforged.fml.loading.LoadingModList;
 
-/** Fast headless invariants for the early-game goggles, drafting table and blueprint assets. */
+/** Fast headless invariants for the early-game goggles, controller and multiblock assets. */
 public final class BlueprintFlowCheck {
 
     private BlueprintFlowCheck() {}
@@ -49,15 +49,19 @@ public final class BlueprintFlowCheck {
             goggles.getAsJsonObject("result").get("id").getAsString(),
             "goggles recipe result");
 
-        JsonObject table = json("data/swindustry/recipe/drafting_table.json");
-        assertEquals("building", table.get("category").getAsString(),
-            "drafting table recipe-book category");
-        Set<String> tableItems = ingredientItems(table);
-        assertEquals(Set.of("minecraft:paper", "minecraft:stick"), tableItems,
-            "drafting table item ingredients");
-        JsonObject tableKey = table.getAsJsonObject("key");
-        assertEquals("minecraft:planks", tableKey.getAsJsonObject("W").get("tag").getAsString(),
-            "drafting table wood tag");
+        JsonObject kilnPort = json("data/swindustry/recipe/clay_kiln_port.json");
+        assertEquals("minecraft:crafting_shaped", kilnPort.get("type").getAsString(),
+            "kiln port recipe type");
+        assertEquals("swindustry:clay_kiln_port",
+            kilnPort.getAsJsonObject("result").get("id").getAsString(),
+            "kiln port recipe result");
+
+        JsonObject campfire = json("data/swindustry/recipe/primitive_campfire.json");
+        assertEquals("minecraft:crafting_shaped", campfire.get("type").getAsString(),
+            "campfire recipe type");
+        assertEquals("swindustry:primitive_campfire",
+            campfire.getAsJsonObject("result").get("id").getAsString(),
+            "campfire recipe result");
 
         JsonObject cordage = json("data/swindustry/recipe/reed_cordage.json");
         assertEquals("minecraft:crafting_shaped", cordage.get("type").getAsString(),
@@ -73,20 +77,6 @@ public final class BlueprintFlowCheck {
             "reed cordage result");
         assertEquals(1, cordage.getAsJsonObject("result").get("count").getAsInt(),
             "reed cordage output count");
-
-        JsonObject drafting = json("data/swindustry/recipe/drafting/clay_kiln.json");
-        assertEquals("swindustry:drafting", drafting.get("type").getAsString(),
-            "drafting recipe type");
-        assertEquals("swindustry:clay_kiln_port",
-            drafting.getAsJsonObject("reference").get("item").getAsString(),
-            "kiln blueprint reusable reference");
-        assertEquals("swindustry:clay_kiln_blueprint",
-            drafting.getAsJsonObject("result").get("id").getAsString(),
-            "kiln blueprint result");
-
-        JsonObject calibration = json("data/swindustry/recipe/goggle_calibration.json");
-        assertEquals("swindustry:goggle_calibration", calibration.get("type").getAsString(),
-            "fallback calibration recipe type");
     }
 
     private static void checkBlueprintDefinition() {
@@ -107,33 +97,16 @@ public final class BlueprintFlowCheck {
 
     private static void checkResourcesAndTextures() throws IOException {
         require("assets/swindustry/models/item/primitive_engineer_goggles.json");
-        require("assets/swindustry/models/item/clay_kiln_blueprint.json");
-        require("assets/swindustry/models/item/drafting_table.json");
-        require("assets/swindustry/models/block/drafting_table.json");
-        require("assets/swindustry/blockstates/drafting_table.json");
-        require("data/swindustry/loot_table/blocks/drafting_table.json");
-
-        JsonObject states = json("assets/swindustry/blockstates/drafting_table.json");
-        JsonObject variants = states.getAsJsonObject("variants");
-        assertEquals(Set.of("facing=north", "facing=east", "facing=south", "facing=west"),
-            variants.keySet(), "drafting table facing models");
-
         checkImage("assets/swindustry/textures/item/primitive_engineer_goggles.png", 16, 16, true);
-        checkImage("assets/swindustry/textures/item/clay_kiln_blueprint.png", 16, 16, true);
         checkImage("assets/swindustry/textures/models/armor/engineer_goggles_layer_1.png", 64, 32, true);
     }
 
     private static void checkTranslations() throws IOException {
         Set<String> required = Set.of(
-            "container.swindustry.drafting_table",
-            "container.swindustry.drafting_table.paper_hint",
-            "container.swindustry.drafting_table.ink_hint",
-            "container.swindustry.drafting_table.reference_hint",
-            "container.swindustry.drafting_table.result_hint",
-            "item.swindustry.primitive_engineer_goggles.empty",
-            "item.swindustry.primitive_engineer_goggles.loaded",
-            "item.swindustry.multiblock_blueprint.calibration_hint",
-            "message.swindustry.blueprint.calibrated",
+            "item.swindustry.primitive_engineer_goggles",
+            "item.swindustry.primitive_engineer_goggles.early_frame",
+            "item.swindustry.primitive_engineer_goggles.use_hint",
+            "message.swindustry.goggles.structure_complete",
             "message.swindustry.goggles.structure_incomplete"
         );
         for (String locale : Set.of("en_us", "ru_ru")) {
