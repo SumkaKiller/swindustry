@@ -7,6 +7,7 @@ import com.jokerdayn.swindustry.multiblock.MultiblockControllerEntity;
 import com.jokerdayn.swindustry.multiblock.MultiblockPattern;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -52,12 +53,7 @@ public final class MultiblockGhostRenderer {
         }
 
         BlockPos playerPos = player.blockPosition();
-        PoseStack poseStack = event.getPoseStack();
-        Vec3 cameraPos = event.getCamera().getPosition();
-        MultiBufferSource.BufferSource bufferSource = mc.renderBuffers().bufferSource();
-
-        poseStack.pushPose();
-        poseStack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
+        List<MultiblockPattern.InspectionCell> missingCells = new ArrayList<>();
 
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         for (int dx = -SEARCH_RADIUS; dx <= SEARCH_RADIUS; dx++) {
@@ -66,31 +62,50 @@ public final class MultiblockGhostRenderer {
                     cursor.set(playerPos.getX() + dx, playerPos.getY() + dy, playerPos.getZ() + dz);
                     BlockEntity be = level.getBlockEntity(cursor);
                     if (be instanceof MultiblockControllerEntity controller && !controller.isFormed()) {
-                        renderControllerGhost(controller, poseStack, bufferSource);
+                        for (MultiblockPattern.InspectionCell cell : controller.inspectStructure()) {
+                            if (!cell.matches()) {
+                                missingCells.add(cell);
+                            }
+                        }
                     }
                 }
             }
         }
 
-        bufferSource.endBatch(RenderType.lines());
-        bufferSource.endBatch(RenderType.debugFilledBox());
-        poseStack.popPose();
-    }
-
-    private static void renderControllerGhost(MultiblockControllerEntity controller,
-                                              PoseStack poseStack, MultiBufferSource bufferSource) {
-        List<MultiblockPattern.InspectionCell> cells = controller.inspectStructure();
-        if (cells.isEmpty()) {
+        if (missingCells.isEmpty()) {
             return;
         }
 
-        VertexConsumer linesConsumer = bufferSource.getBuffer(RenderType.lines());
+        PoseStack poseStack = event.getPoseStack();
+        Vec3 cameraPos = event.getCamera().getPosition();
+        MultiBufferSource.BufferSource bufferSource = mc.renderBuffers().bufferSource();
 
-        for (MultiblockPattern.InspectionCell cell : cells) {
-            if (cell.matches()) {
-                continue;
+        poseStack.pushPose();
+        poseStack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
+
+        // Pass 1: Render translucent filled boxes in a single batch
+        VertexConsumer filledConsumer = bufferSource.getBuffer(RenderType.debugFilledBox());
+        for (MultiblockPattern.InspectionCell cell : missingCells) {
+            BlockPos pos = cell.pos();
+            double minX = pos.getX() + 0.01;
+            double minY = pos.getY() + 0.01;
+            double minZ = pos.getZ() + 0.01;
+            double maxX = pos.getX() + 0.99;
+            double maxY = pos.getY() + 0.99;
+            double maxZ = pos.getZ() + 0.99;
+
+            if (cell.expected().role() == BlockMatcher.Role.WALL) {
+                renderFilledBox(poseStack, filledConsumer, minX, minY, minZ, maxX, maxY, maxZ,
+                    0.25F, 0.72F, 0.92F, 0.22F);
+            } else if (cell.expected().role() == BlockMatcher.Role.CAVITY) {
+                renderFilledBox(poseStack, filledConsumer, minX, minY, minZ, maxX, maxY, maxZ,
+                    0.95F, 0.25F, 0.15F, 0.35F);
             }
+        }
 
+        // Pass 2: Render wireframe outlines in a single batch
+        VertexConsumer linesConsumer = bufferSource.getBuffer(RenderType.lines());
+        for (MultiblockPattern.InspectionCell cell : missingCells) {
             BlockPos pos = cell.pos();
             double minX = pos.getX() + 0.01;
             double minY = pos.getY() + 0.01;
@@ -102,22 +117,19 @@ public final class MultiblockGhostRenderer {
             if (cell.expected().role() == BlockMatcher.Role.WALL) {
                 LevelRenderer.renderLineBox(poseStack, linesConsumer, minX, minY, minZ, maxX, maxY, maxZ,
                     0.25F, 0.72F, 0.92F, 0.85F);
-                renderGhostBox(poseStack, bufferSource, minX, minY, minZ, maxX, maxY, maxZ,
-                    0.25F, 0.72F, 0.92F, 0.22F);
             } else if (cell.expected().role() == BlockMatcher.Role.CAVITY) {
                 LevelRenderer.renderLineBox(poseStack, linesConsumer, minX, minY, minZ, maxX, maxY, maxZ,
                     0.95F, 0.25F, 0.15F, 0.90F);
-                renderGhostBox(poseStack, bufferSource, minX, minY, minZ, maxX, maxY, maxZ,
-                    0.95F, 0.25F, 0.15F, 0.35F);
             }
         }
+
+        poseStack.popPose();
     }
 
-    private static void renderGhostBox(PoseStack poseStack, MultiBufferSource bufferSource,
+    private static void renderFilledBox(PoseStack poseStack, VertexConsumer builder,
                                        double minX, double minY, double minZ,
                                        double maxX, double maxY, double maxZ,
                                        float r, float g, float b, float a) {
-        VertexConsumer builder = bufferSource.getBuffer(RenderType.debugFilledBox());
         Matrix4f mat = poseStack.last().pose();
 
         float x1 = (float) minX;
