@@ -58,7 +58,7 @@ public class ClayKilnMenu extends AbstractContainerMenu {
      */
     public ClayKilnMenu(int containerId, Inventory playerInventory, FriendlyByteBuf buffer) {
         super(ModMenus.CLAY_KILN.get(), containerId);
-        this.pos = buffer.readBlockPos();
+        this.pos = buffer != null && buffer.readableBytes() >= 8 ? buffer.readBlockPos() : BlockPos.ZERO;
 
         ClayKilnBlockEntity found = playerInventory.player.level().getBlockEntity(pos)
             instanceof ClayKilnBlockEntity kilnEntity ? kilnEntity : null;

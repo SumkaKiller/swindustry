@@ -207,6 +207,12 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     @Override
     protected void onFormed(com.jokerdayn.swindustry.multiblock.MultiblockInstance instance) {
         status = KilnStatus.IDLE;
+        if (level != null && !level.isClientSide) {
+            level.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP,
+                net.minecraft.sounds.SoundSource.BLOCKS, 0.65F, 1.25F);
+            level.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.ANVIL_PLACE,
+                net.minecraft.sounds.SoundSource.BLOCKS, 0.50F, 0.85F);
+        }
     }
 
     @Override

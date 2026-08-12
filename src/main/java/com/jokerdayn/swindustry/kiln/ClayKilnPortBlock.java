@@ -118,6 +118,12 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
         return InteractionResult.CONSUME;
     }
 
+    @Nullable
+    @Override
+    protected net.minecraft.world.MenuProvider getMenuProvider(BlockState state, Level level, BlockPos pos) {
+        return level.getBlockEntity(pos) instanceof ClayKilnBlockEntity kiln ? kiln : null;
+    }
+
     @Override
     protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean movedByPiston) {
         if (!state.is(newState.getBlock())) {

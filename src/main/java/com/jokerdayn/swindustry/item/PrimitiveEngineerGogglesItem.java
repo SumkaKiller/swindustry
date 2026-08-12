@@ -94,11 +94,12 @@ public final class PrimitiveEngineerGogglesItem extends ArmorItem {
             }
         }
 
-        serverPlayer.playNotifySound(SoundEvents.SPYGLASS_USE, SoundSource.PLAYERS, 0.55F, 1.35F);
         if (correctWalls == wallCells && blockedCavities == 0) {
+            serverPlayer.playNotifySound(SoundEvents.PLAYER_LEVELUP, SoundSource.PLAYERS, 0.65F, 1.35F);
             player.displayClientMessage(
                 Component.translatable("message.swindustry.goggles.structure_complete"), true);
         } else {
+            serverPlayer.playNotifySound(SoundEvents.SPYGLASS_USE, SoundSource.PLAYERS, 0.50F, 0.90F);
             player.displayClientMessage(Component.translatable(
                 "message.swindustry.goggles.structure_incomplete",
                 correctWalls, wallCells, blockedCavities), true);
