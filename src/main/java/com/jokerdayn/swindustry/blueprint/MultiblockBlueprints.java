@@ -35,10 +35,19 @@ public final class MultiblockBlueprints {
         return definition;
     }
 
+    /** Finds a blueprint definition by its unique identifier. */
     public static Optional<Definition> byId(ResourceLocation id) {
         return Optional.ofNullable(DEFINITIONS.get(id));
     }
 
+    /**
+     * Blueprint registration metadata linking a multiblock pattern with its corresponding controller block.
+     *
+     * @param id             unique identifier of the blueprint definition
+     * @param pattern        supplier resolving to the multiblock pattern definition
+     * @param controller     supplier resolving to the machine controller block
+     * @param translationKey localization key for displaying the blueprint name
+     */
     public record Definition(
         ResourceLocation id,
         Supplier<MultiblockPattern> pattern,
@@ -52,11 +61,16 @@ public final class MultiblockBlueprints {
             Objects.requireNonNull(translationKey, "translationKey");
         }
 
+        /** Returns the localized name component for this blueprint. */
         public Component name() {
             return Component.translatable(translationKey);
         }
 
-        /** Both checks matter when a future controller can switch between more than one pattern. */
+        /**
+         * Checks whether the given controller block entity matches this blueprint definition.
+         *
+         * <p>Both checks matter when a future controller can switch between more than one pattern.</p>
+         */
         public boolean matches(MultiblockControllerEntity candidate) {
             return candidate.getBlockState().is(controller.get())
                 && candidate.structurePattern() == pattern.get();

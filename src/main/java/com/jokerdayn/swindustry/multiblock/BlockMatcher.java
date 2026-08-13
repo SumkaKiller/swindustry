@@ -65,6 +65,11 @@ public interface BlockMatcher {
         return new Impl(Role.WALL, (level, pos, state) -> state.is(block.get()));
     }
 
+    /** Requires exactly this block. */
+    static BlockMatcher block(Block block) {
+        return new Impl(Role.WALL, (level, pos, state) -> state.is(block));
+    }
+
     /** Requires one of the given blocks. */
     static BlockMatcher blocks(List<Supplier<? extends Block>> blocks) {
         List<Supplier<? extends Block>> candidates = List.copyOf(blocks);
