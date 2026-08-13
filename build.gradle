@@ -208,6 +208,38 @@ tasks.register('campfireChecks', JavaExec) {
     dependsOn checksClasses
 }
 
+tasks.register('guiTextureChecks', JavaExec) {
+    group = 'verification'
+    description = 'Verifies the clay kiln GUI atlas dimensions, coordinates and palette.'
+    classpath = sourceSets.checks.runtimeClasspath
+    mainClass = 'com.jokerdayn.swindustry.checks.GuiTextureCheck'
+    dependsOn checksClasses
+}
+
+tasks.register('blueprintChecks', JavaExec) {
+    group = 'verification'
+    description = 'Verifies early blueprint progression, definitions, translations and item textures.'
+    classpath = sourceSets.checks.runtimeClasspath
+    mainClass = 'com.jokerdayn.swindustry.checks.BlueprintFlowCheck'
+    dependsOn checksClasses
+}
+
+tasks.register('stage1ProgressionChecks', JavaExec) {
+    group = 'verification'
+    description = 'Verifies Stage 1 bronze equipment tag integration.'
+    classpath = sourceSets.checks.runtimeClasspath
+    mainClass = 'com.jokerdayn.swindustry.checks.Stage1ProgressionCheck'
+    dependsOn checksClasses
+}
+
+tasks.register('structurePatternChecks', JavaExec) {
+    group = 'verification'
+    description = 'Verifies NBT structure multiblock loader, tag mappings, and round-trip export.'
+    classpath = sourceSets.checks.runtimeClasspath
+    mainClass = 'com.jokerdayn.swindustry.checks.StructurePatternCheck'
+    dependsOn checksClasses
+}
+
 tasks.named('check').configure {
-    dependsOn 'multiblockChecks', 'campfireChecks'
+    dependsOn 'multiblockChecks', 'campfireChecks', 'guiTextureChecks', 'blueprintChecks', 'stage1ProgressionChecks', 'structurePatternChecks'
 }

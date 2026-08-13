@@ -72,26 +72,44 @@ public class ClayKilnMenu extends AbstractContainerMenu {
     }
 
     private void addKilnSlots() {
-        // These coordinates follow the custom clay_kiln.png frame. The player inventory still uses
-        // the vanilla grid at the bottom of the sheet, while the kiln's own cells sit higher.
-        addSlot(new SlotItemHandler(kiln, ClayKilnBlockEntity.SLOT_INPUT, 56, 8));
-        addSlot(new SlotItemHandler(kiln, ClayKilnBlockEntity.SLOT_FUEL, 56, 49));
-        addSlot(new OutputSlot(kiln, ClayKilnBlockEntity.SLOT_OUTPUT, 116, 30));
+        addSlot(new KilnSlot(kiln, ClayKilnBlockEntity.SLOT_INPUT, 28, 34));
+        addSlot(new KilnSlot(kiln, ClayKilnBlockEntity.SLOT_FUEL, 28, 65));
+        addSlot(new OutputSlot(kiln, ClayKilnBlockEntity.SLOT_OUTPUT, 158, 50));
     }
 
     private void addPlayerSlots(Inventory playerInventory) {
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
-                addSlot(new Slot(playerInventory, column + row * 9 + 9, 8 + column * 18, 84 + row * 18));
+                addSlot(new Slot(playerInventory, column + row * 9 + 9, 20 + column * 18, 112 + row * 18));
             }
         }
         for (int column = 0; column < 9; column++) {
-            addSlot(new Slot(playerInventory, column, 8 + column * 18, 142));
+            addSlot(new Slot(playerInventory, column, 20 + column * 18, 170));
+        }
+    }
+
+    /**
+     * Vanilla's shift-click merge mutates an existing slot stack in place and then only calls
+     * {@link Slot#setChanged()}. SlotItemHandler's default implementation points at a dummy
+     * container, so explicitly dirty the real block entity or a partial merge can vanish on unload.
+     */
+    private class KilnSlot extends SlotItemHandler {
+        KilnSlot(IItemHandler handler, int index, int x, int y) {
+            super(handler, index, x, y);
+        }
+
+        @Override
+        public void setChanged() {
+            super.setChanged();
+            if (blockEntity != null && blockEntity.getLevel() != null
+                && !blockEntity.getLevel().isClientSide) {
+                blockEntity.setChanged();
+            }
         }
     }
 
     /** Nothing may be put into the output slot, and taking from it is one-way. */
-    private static class OutputSlot extends SlotItemHandler {
+    private class OutputSlot extends KilnSlot {
         OutputSlot(IItemHandler handler, int index, int x, int y) {
             super(handler, index, x, y);
         }
@@ -130,6 +148,22 @@ public class ClayKilnMenu extends AbstractContainerMenu {
         return data.get(ClayKilnBlockEntity.DATA_FORMED) != 0;
     }
 
+    public KilnStatus status() {
+        return KilnStatus.byId(data.get(ClayKilnBlockEntity.DATA_STATUS));
+    }
+
+    public int tier() {
+        return Math.max(KilnRecipe.TIER_CLAY, data.get(ClayKilnBlockEntity.DATA_TIER));
+    }
+
+    public int fuelTicksRemaining() {
+        return Math.max(0, data.get(ClayKilnBlockEntity.DATA_FUEL_SECONDS)) * 20;
+    }
+
+    public int cookPercent() {
+        return Math.round(cookProgress() * 100.0F);
+    }
+
     // ------------------------------------------------------------------
 
     @Override
@@ -143,6 +177,9 @@ public class ClayKilnMenu extends AbstractContainerMenu {
 
     @Override
     public ItemStack quickMoveStack(Player player, int index) {
+        if (index < 0 || index >= slots.size()) {
+            return ItemStack.EMPTY;
+        }
         Slot slot = slots.get(index);
         if (!slot.hasItem()) {
             return ItemStack.EMPTY;
@@ -157,8 +194,14 @@ public class ClayKilnMenu extends AbstractContainerMenu {
                 return ItemStack.EMPTY;
             }
             slot.onQuickCraft(stack, original);
+        } else if (blockEntity != null && blockEntity.canProcess(stack)) {
+            // Recipe inputs win over fuel. Logs can be both, and the kiln's charcoal progression
+            // is much less frustrating when shift-click sends them to the input by default.
+            if (!moveItemStackTo(stack, ClayKilnBlockEntity.SLOT_INPUT,
+                ClayKilnBlockEntity.SLOT_INPUT + 1, false)) {
+                return ItemStack.EMPTY;
+            }
         } else if (stack.getBurnTime(RecipeType.SMELTING) > 0) {
-            // Fuel knows where it belongs.
             if (!moveItemStackTo(stack, ClayKilnBlockEntity.SLOT_FUEL, ClayKilnBlockEntity.SLOT_FUEL + 1, false)) {
                 return ItemStack.EMPTY;
             }

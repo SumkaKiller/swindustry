@@ -25,6 +25,6 @@ public final class ModCapabilities {
         event.registerBlockEntity(
             Capabilities.ItemHandler.BLOCK,
             ModBlockEntities.CLAY_KILN.get(),
-            (blockEntity, side) -> blockEntity.itemHandler());
+            (blockEntity, side) -> blockEntity.itemHandler(side));
     }
 }

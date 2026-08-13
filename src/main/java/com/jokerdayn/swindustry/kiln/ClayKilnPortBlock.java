@@ -1,5 +1,6 @@
 package com.jokerdayn.swindustry.kiln;
 
+import com.jokerdayn.swindustry.item.PrimitiveEngineerGogglesItem;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
@@ -100,6 +101,10 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
         }
         if (!(level.getBlockEntity(pos) instanceof ClayKilnBlockEntity kiln)) {
             return InteractionResult.PASS;
+        }
+
+        if (player.isShiftKeyDown() && PrimitiveEngineerGogglesItem.inspectWorn(player, kiln)) {
+            return InteractionResult.CONSUME;
         }
 
         // Check on demand rather than trusting the last scheduled result: a player who just placed

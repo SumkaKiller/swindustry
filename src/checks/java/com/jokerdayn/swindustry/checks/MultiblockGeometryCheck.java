@@ -169,12 +169,17 @@ public final class MultiblockGeometryCheck {
             }
         }
 
-        // Sanity on the size of that list: four facings over the non-controller walls, plus the
-        // member itself. Anything much larger means duplicated work on every block break.
-        int expected = (walls.size() - 1) * 4 + 1;
-        int actual = kiln.candidateControllerPositions(BlockPos.ZERO).size();
-        check("reverse lookup checks " + expected + " positions", actual == expected,
-            "got " + actual);
+        // Symmetric shells produce the same candidate through several facing/offset pairs. The
+        // public lookup must remove those duplicates or every brick break repeats block-entity
+        // reads for no benefit.
+        int naiveUpperBound = (walls.size() - 1) * 4 + 1;
+        List<BlockPos> candidates = kiln.candidateControllerPositions(BlockPos.ZERO);
+        int unique = new HashSet<>(candidates).size();
+        check("reverse lookup candidates are unique", candidates.size() == unique,
+            candidates.size() + " entries but only " + unique + " unique positions");
+        check("reverse lookup stays within its geometric upper bound",
+            candidates.size() <= naiveUpperBound,
+            "got " + candidates.size() + ", upper bound " + naiveUpperBound);
     }
 
     /**

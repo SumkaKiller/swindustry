@@ -1,5 +1,6 @@
 package com.jokerdayn.swindustry.multiblock;
 
+import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
@@ -11,10 +12,11 @@ import org.jetbrains.annotations.Nullable;
 /**
  * Base class for the block entity that owns a machine.
  *
- * <p>It keeps exactly one piece of derived state: the {@link MultiblockInstance} produced the last
- * time the pattern was checked, or {@code null} when the machine is not assembled. That state is
- * never written to disk — on load the machine simply checks itself again, so a world edited while
- * the server was down can never leave a machine believing in blocks that are no longer there.</p>
+ * <p>It keeps the {@link MultiblockInstance} produced the last time the pattern was checked, or
+ * {@code null} when the machine is not assembled, plus a transient flag while validation is
+ * waiting on an unloaded chunk. Neither is written to disk — on load the machine checks itself
+ * again, so a world edited while the server was down can never leave it believing in missing
+ * blocks.</p>
  *
  * <h2>When the check runs</h2>
  * <ul>
@@ -32,6 +34,9 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
 
     @Nullable
     private MultiblockInstance formed;
+
+    /** True while validation is paused because at least one required chunk is unavailable. */
+    private boolean validationDeferred;
 
     /** Game time of the next scheduled check; {@link Long#MIN_VALUE} forces one immediately. */
     private long nextCheckAt = Long.MIN_VALUE;
@@ -56,12 +61,40 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
     }
 
     public boolean isFormed() {
-        return formed != null;
+        return formed != null && !validationDeferred;
+    }
+
+    /** Exposed read-only for blueprint tools; subclasses still own the pattern declaration. */
+    public final MultiblockPattern structurePattern() {
+        return pattern();
+    }
+
+    /** The current outward-facing direction used to orient a blueprint projection. */
+    @Nullable
+    public final Direction structureFacing() {
+        return controllerFacing(getBlockState());
+    }
+
+    /** Every meaningful cell resolved against the current world for goggles and diagnostics. */
+    public final List<MultiblockPattern.InspectionCell> inspectStructure() {
+        if (level == null) {
+            return List.of();
+        }
+        Direction facing = structureFacing();
+        return facing == null ? List.of() : pattern().inspect(level, worldPosition, facing);
+    }
+
+    public final List<MultiblockPattern.Mismatch> structureMismatches() {
+        if (level == null) {
+            return List.of();
+        }
+        Direction facing = structureFacing();
+        return facing == null ? List.of() : pattern().mismatches(level, worldPosition, facing, 0);
     }
 
     @Nullable
     public MultiblockInstance instance() {
-        return formed;
+        return isFormed() ? formed : null;
     }
 
     /** Drops the cached answer so the next check runs the pattern again. */
@@ -82,9 +115,19 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
 
         Direction facing = controllerFacing(getBlockState());
         MultiblockInstance previous = formed;
-        formed = facing == null
-            ? null
-            : pattern().match(level, worldPosition, facing).orElse(null);
+        MultiblockInstance next = null;
+        if (facing != null) {
+            MultiblockPattern.MatchResult result = pattern().evaluate(level, worldPosition, facing);
+            if (!result.conclusive()) {
+                // Keep the last verified instance only as a cache. isFormed() remains false and the
+                // machine pauses until every required chunk can be checked again.
+                validationDeferred = true;
+                return false;
+            }
+            next = result.instance().orElse(null);
+        }
+        validationDeferred = false;
+        formed = next;
 
         if (formed != null && previous == null) {
             onFormed(formed);
@@ -108,7 +151,7 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
         if (level.getGameTime() >= nextCheckAt) {
             return revalidate();
         }
-        return formed != null;
+        return isFormed();
     }
 
     /** Called once when the machine goes from taken apart to assembled. */
@@ -123,6 +166,7 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
         // while it still exists — a subclass will want to stop its fire and clear its state, which
         // usually means touching its own block. There is no block left to touch here.
         formed = null;
+        validationDeferred = false;
         super.setRemoved();
     }
 
