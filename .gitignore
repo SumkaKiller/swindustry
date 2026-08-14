@@ -43,3 +43,4 @@ repo/
 ### Misc ###
 *.log
 crash-reports/
+audit.txt

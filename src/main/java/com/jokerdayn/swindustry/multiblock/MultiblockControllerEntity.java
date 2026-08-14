@@ -41,6 +41,9 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
     /** Game time of the next scheduled check; {@link Long#MIN_VALUE} forces one immediately. */
     private long nextCheckAt = Long.MIN_VALUE;
 
+    /** Tracks whether the initial structure check has occurred in this game session. */
+    private boolean sessionInitialized;
+
     protected MultiblockControllerEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
     }
@@ -130,12 +133,17 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
         formed = next;
 
         if (formed != null && previous == null) {
-            onFormed(formed);
+            if (sessionInitialized) {
+                onFormed(formed);
+            }
             setChanged();
         } else if (formed == null && previous != null) {
-            onUnformed();
+            if (sessionInitialized) {
+                onUnformed();
+            }
             setChanged();
         }
+        sessionInitialized = true;
         return formed != null;
     }
 

@@ -20,9 +20,6 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.DustParticleOptions;
-import net.minecraft.core.particles.ParticleTypes;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
@@ -31,21 +28,21 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix4f;
-import org.joml.Vector3f;
 
 /**
- * Client-side in-world renderer that displays translucent block models, warning boxes, and ambient
- * sparkles for incomplete multiblock structures when wearing engineer goggles.
+ * Client-side in-world renderer that displays true translucent ghost block models (Litematica style),
+ * crisp warning boxes for blocked cavities, and clean outlines when wearing engineer goggles.
  */
 @EventBusSubscriber(modid = SWIndustry.MODID, value = Dist.CLIENT)
 public final class MultiblockGhostRenderer {
 
-    private static final DustParticleOptions GHOST_DUST =
-        new DustParticleOptions(new Vector3f(0.25F, 0.72F, 0.92F), 0.60F);
+    private static final float GHOST_ALPHA = 0.45F;
+    private static final int HORIZONTAL_RADIUS = 16;
+    private static final int VERTICAL_RADIUS = 8;
+    private static final int SCAN_INTERVAL_TICKS = 8;
 
     private static long lastScanTick = -1;
     private static final List<BlockPos> CACHED_CONTROLLER_POSITIONS = new ArrayList<>();
-    private static final RandomSource RANDOM = RandomSource.create();
 
     private MultiblockGhostRenderer() {}
 
@@ -103,8 +100,10 @@ public final class MultiblockGhostRenderer {
         poseStack.pushPose();
         poseStack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
-        // 1. Render actual translucent block models for missing walls
-        MultiBufferSource translucentSource = renderType -> bufferSource.getBuffer(RenderType.translucent());
+        // 1. Render true translucent textured block models using AlphaVertexConsumer (Litematica / Create style)
+        MultiBufferSource translucentSource = renderType ->
+            new AlphaVertexConsumer(bufferSource.getBuffer(RenderType.translucent()), GHOST_ALPHA);
+
         for (MultiblockPattern.InspectionCell cell : missingWalls) {
             BlockPos pos = cell.pos();
             poseStack.pushPose();
@@ -114,7 +113,7 @@ public final class MultiblockGhostRenderer {
             poseStack.popPose();
         }
 
-        // 2. Render red warning boxes for blocked cavities (rendered slightly expanded so solid obstacles are clearly visible)
+        // 2. Render red warning boxes for blocked cavities (expanded bounds so solid obstacles are enveloped and clearly visible)
         if (!blockedCavities.isEmpty()) {
             VertexConsumer filledConsumer = bufferSource.getBuffer(RenderType.debugFilledBox());
             for (MultiblockPattern.InspectionCell cell : blockedCavities) {
@@ -126,14 +125,14 @@ public final class MultiblockGhostRenderer {
             }
         }
 
-        // 3. Render crisp wireframe outlines
+        // 3. Render crisp outlines
         VertexConsumer linesConsumer = bufferSource.getBuffer(RenderType.lines());
         for (MultiblockPattern.InspectionCell cell : missingWalls) {
             BlockPos pos = cell.pos();
             LevelRenderer.renderLineBox(poseStack, linesConsumer,
                 pos.getX(), pos.getY(), pos.getZ(),
                 pos.getX() + 1.0, pos.getY() + 1.0, pos.getZ() + 1.0,
-                0.25F, 0.72F, 0.92F, 0.65F);
+                0.25F, 0.72F, 0.92F, 0.70F);
         }
 
         for (MultiblockPattern.InspectionCell cell : blockedCavities) {
@@ -145,38 +144,29 @@ public final class MultiblockGhostRenderer {
         }
 
         poseStack.popPose();
-
-        // 4. Subtle ambient particles along ghost bounds (Point 4)
-        if (RANDOM.nextFloat() < 0.18F && !missingWalls.isEmpty()) {
-            MultiblockPattern.InspectionCell randomCell = missingWalls.get(RANDOM.nextInt(missingWalls.size()));
-            BlockPos p = randomCell.pos();
-            level.addParticle(GHOST_DUST,
-                p.getX() + RANDOM.nextDouble(),
-                p.getY() + RANDOM.nextDouble(),
-                p.getZ() + RANDOM.nextDouble(),
-                0.0, 0.02, 0.0);
-            if (RANDOM.nextBoolean()) {
-                level.addParticle(ParticleTypes.ENCHANT,
-                    p.getX() + RANDOM.nextDouble(),
-                    p.getY() + 0.9 + RANDOM.nextDouble() * 0.2,
-                    p.getZ() + RANDOM.nextDouble(),
-                    0.0, 0.01, 0.0);
-            }
-        }
     }
 
-    /** Optimized cached scan to keep FPS smooth on older CPUs (Point 6). */
+    /**
+     * Highly optimized, continuous scan that runs periodically without skipping any coordinates.
+     */
     private static List<BlockPos> getNearbyControllers(ClientLevel level, BlockPos playerPos) {
         long tick = level.getGameTime();
-        if (tick != lastScanTick) {
+        if (tick - lastScanTick >= SCAN_INTERVAL_TICKS || tick < lastScanTick) {
             lastScanTick = tick;
             CACHED_CONTROLLER_POSITIONS.clear();
 
             BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
-            for (int dx = -14; dx <= 14; dx += 2) {
-                for (int dy = -4; dy <= 6; dy += 2) {
-                    for (int dz = -14; dz <= 14; dz += 2) {
-                        cursor.set(playerPos.getX() + dx, playerPos.getY() + dy, playerPos.getZ() + dz);
+            int minX = playerPos.getX() - HORIZONTAL_RADIUS;
+            int maxX = playerPos.getX() + HORIZONTAL_RADIUS;
+            int minY = Math.max(level.getMinBuildHeight(), playerPos.getY() - VERTICAL_RADIUS);
+            int maxY = Math.min(level.getMaxBuildHeight(), playerPos.getY() + VERTICAL_RADIUS);
+            int minZ = playerPos.getZ() - HORIZONTAL_RADIUS;
+            int maxZ = playerPos.getZ() + HORIZONTAL_RADIUS;
+
+            for (int x = minX; x <= maxX; x++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    for (int y = minY; y <= maxY; y++) {
+                        cursor.set(x, y, z);
                         if (level.getBlockEntity(cursor) instanceof MultiblockControllerEntity controller
                             && !controller.isFormed()) {
                             CACHED_CONTROLLER_POSITIONS.add(cursor.immutable());
