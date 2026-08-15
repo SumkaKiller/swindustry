@@ -77,16 +77,31 @@ public final class MultiblockGhostRenderer {
 
         List<MultiblockPattern.InspectionCell> missingWalls = new ArrayList<>();
         List<MultiblockPattern.InspectionCell> blockedCavities = new ArrayList<>();
+        java.util.Set<BlockPos> addedMissing = new java.util.HashSet<>();
+        java.util.Set<BlockPos> addedBlocked = new java.util.HashSet<>();
 
         for (BlockPos cPos : controllers) {
             BlockEntity be = level.getBlockEntity(cPos);
             if (be instanceof MultiblockControllerEntity controller && !controller.isFormed()) {
                 for (MultiblockPattern.InspectionCell cell : controller.inspectStructure()) {
                     if (!cell.matches()) {
+                        BlockPos pos = cell.pos();
                         if (cell.expected().role() == BlockMatcher.Role.WALL) {
-                            missingWalls.add(cell);
+                            BlockState currentState = level.getBlockState(pos);
+                            if (currentState.isAir() || (currentState.canBeReplaced() && currentState.getFluidState().isEmpty())) {
+                                if (addedMissing.add(pos)) {
+                                    missingWalls.add(cell);
+                                }
+                            } else {
+                                // A wrong block or fluid is placed where a wall should be -> highlight with red warning box
+                                if (addedBlocked.add(pos)) {
+                                    blockedCavities.add(cell);
+                                }
+                            }
                         } else if (cell.expected().role() == BlockMatcher.Role.CAVITY) {
-                            blockedCavities.add(cell);
+                            if (addedBlocked.add(pos)) {
+                                blockedCavities.add(cell);
+                            }
                         }
                     }
                 }

@@ -67,7 +67,10 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     public static final int DATA_STATUS = 5;
     public static final int DATA_TIER = 6;
     public static final int DATA_FUEL_SECONDS = 7;
-    public static final int DATA_COUNT = 8;
+    public static final int DATA_HEAT = 8;
+    public static final int DATA_COUNT = 9;
+
+    public static final int MAX_HEAT = 1000;
 
     private static final String KEY_ITEMS = "Items";
     private static final String KEY_LIT_TIME = "LitTime";
@@ -76,6 +79,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private static final String KEY_COOK_DURATION = "CookDuration";
     private static final String KEY_EXPERIENCE = "StoredExperience";
     private static final String KEY_ACTIVE_JOB = "ActiveJob";
+    private static final String KEY_HEAT = "Heat";
     private static final String KEY_HANDLER_SIZE = "Size";
     private static final int SAVE_INTERVAL = 20;
 
@@ -107,6 +111,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private int litDuration;
     private int cookProgress;
     private int cookDuration = KilnRecipe.DEFAULT_COOKING_TIME;
+    private int heat;
     private float storedExperience;
     private KilnStatus status = KilnStatus.INCOMPLETE;
     @Nullable
@@ -129,6 +134,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 case DATA_STATUS -> status.id();
                 case DATA_TIER -> tier();
                 case DATA_FUEL_SECONDS -> Math.min(Short.MAX_VALUE, Mth.ceil(litTime / 20.0F));
+                case DATA_HEAT -> Math.min(MAX_HEAT, Math.max(0, heat));
                 default -> 0;
             };
         }
@@ -141,6 +147,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 case DATA_COOK_PROGRESS -> cookProgress = value;
                 case DATA_COOK_DURATION -> cookDuration = value;
                 case DATA_STATUS -> status = KilnStatus.byId(value);
+                case DATA_HEAT -> heat = Math.min(MAX_HEAT, Math.max(0, value));
                 default -> { }
             }
         }
@@ -221,6 +228,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         litTime = 0;
         litDuration = 0;
         cookProgress = 0;
+        heat = 0;
         activeJobKey = null;
         status = KilnStatus.INCOMPLETE;
         if (level == null || level.isClientSide || isRemoved()) {
@@ -264,9 +272,24 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         boolean operational = kiln.revalidateIfStale();
         if (!operational) {
             kiln.status = KilnStatus.INCOMPLETE;
+            if (kiln.heat > 0) {
+                kiln.heat = Math.max(0, kiln.heat - 2);
+                dirty = true;
+            }
         } else {
             if (kiln.litTime > 0) {
                 kiln.litTime--;
+            }
+            if (kiln.isLit()) {
+                if (kiln.heat < MAX_HEAT) {
+                    kiln.heat = Math.min(MAX_HEAT, kiln.heat + 2);
+                    dirty = true;
+                }
+            } else {
+                if (kiln.heat > 0) {
+                    kiln.heat = Math.max(0, kiln.heat - 1);
+                    dirty = true;
+                }
             }
             dirty = kiln.runCookingStep(level) || dirty;
         }
@@ -576,6 +599,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         storedExperience = Float.isFinite(loadedExperience) && loadedExperience >= 0.0F
             ? loadedExperience
             : 0.0F;
+        heat = Mth.clamp(tag.getInt(KEY_HEAT), 0, MAX_HEAT);
         activeJobKey = cookProgress > 0 && tag.contains(KEY_ACTIVE_JOB, Tag.TAG_STRING)
             ? tag.getString(KEY_ACTIVE_JOB)
             : null;
@@ -590,6 +614,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         tag.putInt(KEY_COOK_PROGRESS, cookProgress);
         tag.putInt(KEY_COOK_DURATION, cookDuration);
         tag.putFloat(KEY_EXPERIENCE, storedExperience);
+        tag.putInt(KEY_HEAT, heat);
         if (cookProgress > 0 && activeJobKey != null) {
             tag.putString(KEY_ACTIVE_JOB, activeJobKey);
         }

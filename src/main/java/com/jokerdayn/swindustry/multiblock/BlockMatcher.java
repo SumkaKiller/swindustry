@@ -133,7 +133,7 @@ public interface BlockMatcher {
             new Impl(Role.CAVITY, (level, pos, state) -> state.isAir());
 
         static final BlockMatcher CAVITY = new Impl(Role.CAVITY, (level, pos, state) ->
-            state.isAir() || state.canBeReplaced() || state.is(Blocks.FIRE));
+            state.getFluidState().isEmpty() && (state.isAir() || state.canBeReplaced() || state.is(Blocks.FIRE)));
 
         @Override
         public boolean matches(LevelReader level, BlockPos pos, BlockState state) {

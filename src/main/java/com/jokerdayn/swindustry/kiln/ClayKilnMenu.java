@@ -72,19 +72,19 @@ public class ClayKilnMenu extends AbstractContainerMenu {
     }
 
     private void addKilnSlots() {
-        addSlot(new KilnSlot(kiln, ClayKilnBlockEntity.SLOT_INPUT, 28, 34));
-        addSlot(new KilnSlot(kiln, ClayKilnBlockEntity.SLOT_FUEL, 28, 65));
-        addSlot(new OutputSlot(kiln, ClayKilnBlockEntity.SLOT_OUTPUT, 158, 50));
+        addSlot(new KilnSlot(kiln, ClayKilnBlockEntity.SLOT_INPUT, 42, 17));
+        addSlot(new KilnSlot(kiln, ClayKilnBlockEntity.SLOT_FUEL, 42, 53));
+        addSlot(new OutputSlot(kiln, ClayKilnBlockEntity.SLOT_OUTPUT, 102, 35));
     }
 
     private void addPlayerSlots(Inventory playerInventory) {
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
-                addSlot(new Slot(playerInventory, column + row * 9 + 9, 20 + column * 18, 112 + row * 18));
+                addSlot(new Slot(playerInventory, column + row * 9 + 9, 8 + column * 18, 84 + row * 18));
             }
         }
         for (int column = 0; column < 9; column++) {
-            addSlot(new Slot(playerInventory, column, 20 + column * 18, 170));
+            addSlot(new Slot(playerInventory, column, 8 + column * 18, 142));
         }
     }
 
@@ -142,6 +142,47 @@ public class ClayKilnMenu extends AbstractContainerMenu {
             return 0.0F;
         }
         return Math.min(1.0F, (float) data.get(ClayKilnBlockEntity.DATA_COOK_PROGRESS) / duration);
+    }
+
+    /** Kiln heat progress from 0.0 (cold) to 1.0 (blazing). */
+    public float heatProgress() {
+        return Math.min(1.0F, (float) data.get(ClayKilnBlockEntity.DATA_HEAT) / ClayKilnBlockEntity.MAX_HEAT);
+    }
+
+    public int heatPercent() {
+        return Math.round(heatProgress() * 100.0F);
+    }
+
+    public HeatState heatState() {
+        return HeatState.fromProgress(heatProgress());
+    }
+
+    public enum HeatState {
+        COLD("container.swindustry.clay_kiln.heat.cold"),
+        WARM("container.swindustry.clay_kiln.heat.warm"),
+        HOT("container.swindustry.clay_kiln.heat.hot"),
+        BLAZING("container.swindustry.clay_kiln.heat.blazing");
+
+        private final String translationKey;
+
+        HeatState(String translationKey) {
+            this.translationKey = translationKey;
+        }
+
+        public net.minecraft.network.chat.Component label() {
+            return net.minecraft.network.chat.Component.translatable(translationKey);
+        }
+
+        public static HeatState fromProgress(float progress) {
+            if (progress >= 0.75F) {
+                return BLAZING;
+            } else if (progress >= 0.50F) {
+                return HOT;
+            } else if (progress >= 0.25F) {
+                return WARM;
+            }
+            return COLD;
+        }
     }
 
     public boolean isStructureFormed() {
