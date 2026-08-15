@@ -37,9 +37,9 @@ import org.joml.Matrix4f;
 public final class MultiblockGhostRenderer {
 
     private static final float GHOST_ALPHA = 0.45F;
-    private static final int HORIZONTAL_RADIUS = 16;
-    private static final int VERTICAL_RADIUS = 8;
-    private static final int SCAN_INTERVAL_TICKS = 8;
+    private static final int HORIZONTAL_RADIUS = 32;
+    private static final int VERTICAL_RADIUS = 16;
+    private static final int SCAN_INTERVAL_TICKS = 10;
 
     private static long lastScanTick = -1;
     private static final List<BlockPos> CACHED_CONTROLLER_POSITIONS = new ArrayList<>();
@@ -47,8 +47,14 @@ public final class MultiblockGhostRenderer {
     private MultiblockGhostRenderer() {}
 
     @SubscribeEvent
+    public static void onClientLogout(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
+        CACHED_CONTROLLER_POSITIONS.clear();
+        lastScanTick = -1;
+    }
+
+    @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_PARTICLES) {
             return;
         }
 
@@ -113,26 +119,26 @@ public final class MultiblockGhostRenderer {
             poseStack.popPose();
         }
 
-        // 2. Render red warning boxes for blocked cavities (expanded bounds so solid obstacles are enveloped and clearly visible)
+        // 2. Render red warning boxes for blocked cavities using native chained strip (no diagonal glitch triangles)
         if (!blockedCavities.isEmpty()) {
             VertexConsumer filledConsumer = bufferSource.getBuffer(RenderType.debugFilledBox());
             for (MultiblockPattern.InspectionCell cell : blockedCavities) {
                 BlockPos pos = cell.pos();
-                renderFilledBox(poseStack, filledConsumer,
+                LevelRenderer.addChainedFilledBoxVertices(poseStack, filledConsumer,
                     pos.getX() - 0.005, pos.getY() - 0.005, pos.getZ() - 0.005,
                     pos.getX() + 1.005, pos.getY() + 1.005, pos.getZ() + 1.005,
                     0.95F, 0.15F, 0.15F, 0.40F);
             }
         }
 
-        // 3. Render crisp outlines
+        // 3. Render crisp outlines with subtle 0.002 bias to prevent z-fighting with adjacent solid terrain
         VertexConsumer linesConsumer = bufferSource.getBuffer(RenderType.lines());
         for (MultiblockPattern.InspectionCell cell : missingWalls) {
             BlockPos pos = cell.pos();
             LevelRenderer.renderLineBox(poseStack, linesConsumer,
-                pos.getX(), pos.getY(), pos.getZ(),
-                pos.getX() + 1.0, pos.getY() + 1.0, pos.getZ() + 1.0,
-                0.25F, 0.72F, 0.92F, 0.70F);
+                pos.getX() - 0.002, pos.getY() - 0.002, pos.getZ() - 0.002,
+                pos.getX() + 1.002, pos.getY() + 1.002, pos.getZ() + 1.002,
+                0.25F, 0.72F, 0.92F, 0.45F);
         }
 
         for (MultiblockPattern.InspectionCell cell : blockedCavities) {
@@ -140,14 +146,19 @@ public final class MultiblockGhostRenderer {
             LevelRenderer.renderLineBox(poseStack, linesConsumer,
                 pos.getX() - 0.005, pos.getY() - 0.005, pos.getZ() - 0.005,
                 pos.getX() + 1.005, pos.getY() + 1.005, pos.getZ() + 1.005,
-                0.95F, 0.15F, 0.15F, 0.95F);
+                0.95F, 0.15F, 0.15F, 0.85F);
         }
 
         poseStack.popPose();
+
+        // Flush render batches so ghost projection never leaks into hand/GUI render passes
+        bufferSource.endBatch(RenderType.translucent());
+        bufferSource.endBatch(RenderType.debugFilledBox());
+        bufferSource.endBatch(RenderType.lines());
     }
 
     /**
-     * Highly optimized, continuous scan that runs periodically without skipping any coordinates.
+     * Chunk-level block entity search: scans only loaded block entities instead of brute-forcing thousands of air blocks.
      */
     private static List<BlockPos> getNearbyControllers(ClientLevel level, BlockPos playerPos) {
         long tick = level.getGameTime();
@@ -155,7 +166,11 @@ public final class MultiblockGhostRenderer {
             lastScanTick = tick;
             CACHED_CONTROLLER_POSITIONS.clear();
 
-            BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+            int minChunkX = (playerPos.getX() - HORIZONTAL_RADIUS) >> 4;
+            int maxChunkX = (playerPos.getX() + HORIZONTAL_RADIUS) >> 4;
+            int minChunkZ = (playerPos.getZ() - HORIZONTAL_RADIUS) >> 4;
+            int maxChunkZ = (playerPos.getZ() + HORIZONTAL_RADIUS) >> 4;
+
             int minX = playerPos.getX() - HORIZONTAL_RADIUS;
             int maxX = playerPos.getX() + HORIZONTAL_RADIUS;
             int minY = Math.max(level.getMinBuildHeight(), playerPos.getY() - VERTICAL_RADIUS);
@@ -163,68 +178,24 @@ public final class MultiblockGhostRenderer {
             int minZ = playerPos.getZ() - HORIZONTAL_RADIUS;
             int maxZ = playerPos.getZ() + HORIZONTAL_RADIUS;
 
-            for (int x = minX; x <= maxX; x++) {
-                for (int z = minZ; z <= maxZ; z++) {
-                    for (int y = minY; y <= maxY; y++) {
-                        cursor.set(x, y, z);
-                        if (level.getBlockEntity(cursor) instanceof MultiblockControllerEntity controller
-                            && !controller.isFormed()) {
-                            CACHED_CONTROLLER_POSITIONS.add(cursor.immutable());
+            for (int cx = minChunkX; cx <= maxChunkX; cx++) {
+                for (int cz = minChunkZ; cz <= maxChunkZ; cz++) {
+                    if (level.hasChunk(cx, cz)) {
+                        net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunk(cx, cz);
+                        for (BlockEntity be : chunk.getBlockEntities().values()) {
+                            if (be instanceof MultiblockControllerEntity controller && !controller.isFormed()) {
+                                BlockPos pos = be.getBlockPos();
+                                if (pos.getX() >= minX && pos.getX() <= maxX
+                                    && pos.getY() >= minY && pos.getY() <= maxY
+                                    && pos.getZ() >= minZ && pos.getZ() <= maxZ) {
+                                    CACHED_CONTROLLER_POSITIONS.add(pos.immutable());
+                                }
+                            }
                         }
                     }
                 }
             }
         }
         return CACHED_CONTROLLER_POSITIONS;
-    }
-
-    private static void renderFilledBox(PoseStack poseStack, VertexConsumer builder,
-                                       double minX, double minY, double minZ,
-                                       double maxX, double maxY, double maxZ,
-                                       float r, float g, float b, float a) {
-        Matrix4f mat = poseStack.last().pose();
-
-        float x1 = (float) minX;
-        float y1 = (float) minY;
-        float z1 = (float) minZ;
-        float x2 = (float) maxX;
-        float y2 = (float) maxY;
-        float z2 = (float) maxZ;
-
-        // Down
-        builder.addVertex(mat, x1, y1, z1).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y1, z1).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y1, z2).setColor(r, g, b, a);
-        builder.addVertex(mat, x1, y1, z2).setColor(r, g, b, a);
-
-        // Up
-        builder.addVertex(mat, x1, y2, z2).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y2, z2).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y2, z1).setColor(r, g, b, a);
-        builder.addVertex(mat, x1, y2, z1).setColor(r, g, b, a);
-
-        // North
-        builder.addVertex(mat, x1, y1, z1).setColor(r, g, b, a);
-        builder.addVertex(mat, x1, y2, z1).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y2, z1).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y1, z1).setColor(r, g, b, a);
-
-        // South
-        builder.addVertex(mat, x2, y1, z2).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y2, z2).setColor(r, g, b, a);
-        builder.addVertex(mat, x1, y2, z2).setColor(r, g, b, a);
-        builder.addVertex(mat, x1, y1, z2).setColor(r, g, b, a);
-
-        // West
-        builder.addVertex(mat, x1, y1, z2).setColor(r, g, b, a);
-        builder.addVertex(mat, x1, y2, z2).setColor(r, g, b, a);
-        builder.addVertex(mat, x1, y2, z1).setColor(r, g, b, a);
-        builder.addVertex(mat, x1, y1, z1).setColor(r, g, b, a);
-
-        // East
-        builder.addVertex(mat, x2, y1, z1).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y2, z1).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y2, z2).setColor(r, g, b, a);
-        builder.addVertex(mat, x2, y1, z2).setColor(r, g, b, a);
     }
 }
