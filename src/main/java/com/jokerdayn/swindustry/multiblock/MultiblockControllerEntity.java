@@ -41,8 +41,8 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
     /** Game time of the next scheduled check; {@link Long#MIN_VALUE} forces one immediately. */
     private long nextCheckAt = Long.MIN_VALUE;
 
-    /** Tracks whether the initial structure check has occurred in this game session. */
-    private boolean sessionInitialized;
+    /** False until this session's first conclusive structure check has completed. */
+    private boolean firstValidationDone;
 
     protected MultiblockControllerEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
         super(type, pos, state);
@@ -132,18 +132,22 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
         validationDeferred = false;
         formed = next;
 
+        boolean firstValidation = !firstValidationDone;
+        firstValidationDone = true;
+
+        // Callbacks fire on the load-time transition too: derived state such as the kiln's
+        // cured flag is recomputed from the actual walls instead of trusting saved NBT.
         if (formed != null && previous == null) {
-            if (sessionInitialized) {
-                onFormed(formed);
-            }
+            onFormed(formed);
             setChanged();
         } else if (formed == null && previous != null) {
-            if (sessionInitialized) {
-                onUnformed();
-            }
+            onUnformed();
             setChanged();
+        } else if (firstValidation && formed == null) {
+            // Loaded into a conclusively broken structure: operational state that survived the
+            // save belonged to a machine that no longer exists.
+            onLoadedBroken();
         }
-        sessionInitialized = true;
         return formed != null;
     }
 
@@ -167,6 +171,13 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
 
     /** Called once when the machine goes from assembled to taken apart. */
     protected void onUnformed() {}
+
+    /**
+     * Called once when this session's first conclusive validation finds the machine not assembled.
+     * A teardown that happened while nobody was watching leaves operational state behind in the
+     * save; subclasses drop it here so a rebuilt shell cannot inherit a burn it never lit.
+     */
+    protected void onLoadedBroken() {}
 
     @Override
     public void setRemoved() {

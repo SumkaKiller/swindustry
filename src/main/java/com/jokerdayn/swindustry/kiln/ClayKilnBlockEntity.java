@@ -50,7 +50,7 @@ import org.jetbrains.annotations.Nullable;
  * Everything the clay kiln does.
  *
  * <p>It is a furnace in the way it burns, and nothing like one in the way it exists. It only works
- * when forty-four blocks agree to be a kiln, it checks that agreement rather than assuming it, and
+ * when fifty-seven blocks agree to be a kiln, it checks that agreement rather than assuming it, and
  * it goes cold the moment the agreement breaks.</p>
  *
  * <h2>What it will smelt</h2>
@@ -294,6 +294,19 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     @Override
     protected void onUnformed() {
         // A kiln pulled apart mid-burn loses the burn. The fuel is gone up the hole in the wall.
+        purgeOperationalState();
+        clearLitVisual();
+    }
+
+    @Override
+    protected void onLoadedBroken() {
+        // Loaded with the shell already breached: fuel and progress in the save belonged to a
+        // machine that no longer exists by the time this session starts.
+        purgeOperationalState();
+        clearLitVisual();
+    }
+
+    private void purgeOperationalState() {
         litTime = 0;
         litDuration = 0;
         cookProgress = 0;
@@ -302,6 +315,9 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         curingSchedule.clear();
         scheduleIndex = 0;
         status = KilnStatus.INCOMPLETE;
+    }
+
+    private void clearLitVisual() {
         if (level == null || level.isClientSide || isRemoved()) {
             return;
         }
