@@ -107,9 +107,15 @@ public class PrimitiveCampfireBlock extends BaseEntityBlock {
     @Override
     protected BlockState updateShape(BlockState state, net.minecraft.core.Direction direction, BlockState neighborState,
                                      net.minecraft.world.level.LevelAccessor level, BlockPos pos, BlockPos neighborPos) {
-        return direction == net.minecraft.core.Direction.DOWN && !canSurvive(state, level, pos)
-            ? net.minecraft.world.level.block.Blocks.AIR.defaultBlockState()
-            : state;
+        if (direction == net.minecraft.core.Direction.DOWN && !canSurvive(state, level, pos)) {
+            // Neighbor-update destruction skips normal break loot entirely; drop by stage here
+            // so embers yield their charcoal and soot instead of silently vanishing.
+            if (level instanceof net.minecraft.world.level.Level lvl && !lvl.isClientSide()) {
+                Block.dropResources(state, lvl, pos);
+            }
+            return net.minecraft.world.level.block.Blocks.AIR.defaultBlockState();
+        }
+        return state;
     }
 
     // ------------------------------------------------------------------
