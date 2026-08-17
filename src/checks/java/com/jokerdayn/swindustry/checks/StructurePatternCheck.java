@@ -51,8 +51,8 @@ public final class StructurePatternCheck {
     private static void testKilnNbtLoading() {
         MultiblockPattern kiln = KilnPatterns.CLAY_KILN;
 
-        check("Kiln footprint is 5x6x5", kiln.size().equals(new Vec3i(5, 6, 5)), "got " + kiln.size());
-        check("Kiln blockCount is 44", kiln.blockCount() == 44, "got " + kiln.blockCount());
+        check("Kiln footprint is 5x5x5", kiln.size().equals(new Vec3i(5, 5, 5)), "got " + kiln.size());
+        check("Kiln blockCount is 57", kiln.blockCount() == 57, "got " + kiln.blockCount());
 
         List<Vec3i> walls = new ArrayList<>();
         List<Vec3i> cavities = new ArrayList<>();
@@ -66,9 +66,9 @@ public final class StructurePatternCheck {
             }
         });
 
-        check("Kiln wall cells = 44 (including controller)", walls.size() == 44, "got " + walls.size());
-        check("Kiln cavity cells = 22", cavities.size() == 22, "got " + cavities.size());
-        check("Kiln total accounted cells = 150", (walls.size() + cavities.size() + ignored.size()) == 150,
+        check("Kiln wall cells = 57 (including controller)", walls.size() == 57, "got " + walls.size());
+        check("Kiln cavity cells = 20", cavities.size() == 20, "got " + cavities.size());
+        check("Kiln total accounted cells = 125", (walls.size() + cavities.size() + ignored.size()) == 125,
             "got total " + (walls.size() + cavities.size() + ignored.size()));
     }
 
@@ -97,10 +97,10 @@ public final class StructurePatternCheck {
         MultiblockPattern reloaded = StructurePatternLoader.builder()
             .fromStream(new ByteArrayInputStream(bytes))
             .map("swindustry:raw_clay_bricks", BlockMatcher.tag(ModTags.Blocks.KILN_WALL))
-            .controllerPos(2, 0, 0)
+            .controllerPos(2, 1, 0)
             .build();
 
-        check("Reloaded pattern footprint is 5x6x5", reloaded.size().equals(original.size()), "got " + reloaded.size());
+        check("Reloaded pattern footprint matches", reloaded.size().equals(original.size()), "got " + reloaded.size());
         check("Reloaded pattern blockCount matches", reloaded.blockCount() == original.blockCount(),
             "expected " + original.blockCount() + " got " + reloaded.blockCount());
     }

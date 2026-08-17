@@ -90,9 +90,9 @@ public final class BlueprintFlowCheck {
 
         int[] roles = new int[BlockMatcher.Role.values().length];
         kiln.pattern().get().forEachCell((offset, symbol, matcher) -> roles[matcher.role().ordinal()]++);
-        assertEquals(44, roles[BlockMatcher.Role.WALL.ordinal()], "kiln projected wall count");
-        assertEquals(22, roles[BlockMatcher.Role.CAVITY.ordinal()], "kiln projected cavity count");
-        assertEquals(44, kiln.pattern().get().blockCount(), "kiln material block count");
+        assertEquals(57, roles[BlockMatcher.Role.WALL.ordinal()], "kiln projected wall count");
+        assertEquals(20, roles[BlockMatcher.Role.CAVITY.ordinal()], "kiln projected cavity count");
+        assertEquals(57, kiln.pattern().get().blockCount(), "kiln material block count");
     }
 
     private static void checkResourcesAndTextures() throws IOException {

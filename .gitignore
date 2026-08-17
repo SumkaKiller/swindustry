@@ -44,3 +44,4 @@ repo/
 *.log
 crash-reports/
 audit.txt
+kiln_todo.txt

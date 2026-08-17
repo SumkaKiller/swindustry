@@ -168,7 +168,7 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
     }
 
     /** Where the flue opens, relative to the port, in the pattern's authored orientation. */
-    private static final Vec3i FLUE_TOP = new Vec3i(0, 5, 2);
+    private static final Vec3i FLUE_TOP = new Vec3i(0, 3, 2);
 
     // ------------------------------------------------------------------
 

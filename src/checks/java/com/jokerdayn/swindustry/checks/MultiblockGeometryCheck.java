@@ -30,10 +30,10 @@ import net.neoforged.fml.loading.LoadingModList;
  */
 public final class MultiblockGeometryCheck {
 
-    /** Where the kiln from {@code furnace.nbt} puts its numbers. */
-    private static final int EXPECTED_WALLS = 44;    // 43 bricks plus the loading port
-    private static final int EXPECTED_CAVITY = 22;   // 3x3x2 firebox, the throat, three of flue
-    private static final int EXPECTED_TOTAL_CELLS = 5 * 6 * 5;
+    /** Where the kiln puts its numbers. */
+    private static final int EXPECTED_WALLS = 57;    // 56 bricks plus the loading port
+    private static final int EXPECTED_CAVITY = 20;   // 3x3x2 chamber, throat, flue
+    private static final int EXPECTED_TOTAL_CELLS = 5 * 5 * 5;
 
     private static final Direction[] HORIZONTALS =
         {Direction.NORTH, Direction.EAST, Direction.SOUTH, Direction.WEST};
@@ -68,14 +68,14 @@ public final class MultiblockGeometryCheck {
         List<Vec3i> cavity = byRole.get(BlockMatcher.Role.CAVITY);
         int total = walls.size() + cavity.size() + byRole.get(BlockMatcher.Role.IGNORED).size();
 
-        check("footprint is 5x6x5", kiln.size().equals(new Vec3i(5, 6, 5)),
+        check("footprint is 5x5x5", kiln.size().equals(new Vec3i(5, 5, 5)),
             "got " + kiln.size());
         check("every cell is accounted for", total == EXPECTED_TOTAL_CELLS,
             "walls " + walls.size() + " + cavity " + cavity.size()
                 + " + ignored " + byRole.get(BlockMatcher.Role.IGNORED).size() + " = " + total);
-        check("44 blocks to build", walls.size() == EXPECTED_WALLS && kiln.blockCount() == EXPECTED_WALLS,
+        check("57 blocks to build", walls.size() == EXPECTED_WALLS && kiln.blockCount() == EXPECTED_WALLS,
             "walls " + walls.size() + ", blockCount " + kiln.blockCount());
-        check("22 cells must stay clear", cavity.size() == EXPECTED_CAVITY,
+        check("20 cells must stay clear", cavity.size() == EXPECTED_CAVITY,
             "got " + cavity.size());
         check("exactly one controller cell, at the origin",
             controllerCells.size() == 1 && controllerCells.get(0).equals(Vec3i.ZERO),
@@ -101,12 +101,12 @@ public final class MultiblockGeometryCheck {
      */
     private static void checkFlue(List<Vec3i> cavity) {
         Set<Vec3i> cells = new HashSet<>(cavity);
-        for (int y = 2; y <= 5; y++) {
+        for (int y = 2; y <= 3; y++) {
             Vec3i expected = new Vec3i(0, y, 2);
             check("flue is clear at y=" + y, cells.contains(expected), "missing " + expected);
         }
-        long aboveThroat = cavity.stream().filter(c -> c.getY() >= 3).count();
-        check("flue is exactly three cells tall", aboveThroat == 3, "got " + aboveThroat);
+        long aboveThroat = cavity.stream().filter(c -> c.getY() >= 2).count();
+        check("flue is exactly two cells tall", aboveThroat == 2, "got " + aboveThroat);
     }
 
     /**

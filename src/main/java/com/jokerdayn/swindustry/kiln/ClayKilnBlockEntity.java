@@ -2,17 +2,25 @@ package com.jokerdayn.swindustry.kiln;
 
 import com.jokerdayn.swindustry.Config;
 import com.jokerdayn.swindustry.multiblock.MultiblockControllerEntity;
+import com.jokerdayn.swindustry.multiblock.MultiblockInstance;
 import com.jokerdayn.swindustry.multiblock.MultiblockPattern;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
+import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.jokerdayn.swindustry.registry.ModRecipes;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Containers;
 import net.minecraft.world.MenuProvider;
@@ -29,7 +37,9 @@ import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.item.crafting.SmeltingRecipe;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.ItemStackHandler;
 import org.jetbrains.annotations.Nullable;
@@ -71,6 +81,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     public static final int DATA_COUNT = 9;
 
     public static final int MAX_HEAT = 1000;
+    public static final int WAVE_INTERVAL = 8;
 
     private static final String KEY_ITEMS = "Items";
     private static final String KEY_LIT_TIME = "LitTime";
@@ -80,6 +91,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private static final String KEY_EXPERIENCE = "StoredExperience";
     private static final String KEY_ACTIVE_JOB = "ActiveJob";
     private static final String KEY_HEAT = "Heat";
+    private static final String KEY_CURING_PROGRESS = "CuringProgress";
+    private static final String KEY_CURED = "Cured";
     private static final String KEY_HANDLER_SIZE = "Size";
     private static final int SAVE_INTERVAL = 20;
 
@@ -112,6 +125,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private int cookProgress;
     private int cookDuration = KilnRecipe.DEFAULT_COOKING_TIME;
     private int heat;
+    private int curingProgress;
+    private boolean cured;
     private float storedExperience;
     private KilnStatus status = KilnStatus.INCOMPLETE;
     @Nullable
@@ -204,21 +219,59 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     }
 
     /**
-     * How good this kiln is. Raw clay is the bottom rung; a later shell material reads its tier off
-     * the blocks it is actually built from and returns something higher.
+     * How good this kiln is. Raw clay is tier 0; once the shell bricks have cured into ceramic,
+     * it unlocks tier 1 (bronze recipes).
      */
     public int tier() {
-        return KilnRecipe.TIER_CLAY;
+        return isCured() ? KilnRecipe.TIER_CLAY : 0;
+    }
+
+    public boolean isCured() {
+        return cured;
+    }
+
+    public int effectiveMaxHeat() {
+        if (isCured()) {
+            return MAX_HEAT;
+        }
+        float ratio = curedRatio();
+        return Math.min(MAX_HEAT, 350 + Math.round(650.0F * ratio));
+    }
+
+    public float curedRatio() {
+        MultiblockInstance instance = instance();
+        if (instance == null || level == null) {
+            return cured ? 1.0F : 0.0F;
+        }
+        int rawCount = 0;
+        int curedCount = 0;
+        for (BlockPos wallPos : instance.walls()) {
+            if (wallPos.equals(worldPosition)) {
+                continue;
+            }
+            BlockState state = level.getBlockState(wallPos);
+            if (state.is(ModBlocks.RAW_CLAY_BRICKS.get())) {
+                rawCount++;
+            } else if (state.is(ModBlocks.CLAY_BRICKS.get())) {
+                curedCount++;
+            }
+        }
+        int total = rawCount + curedCount;
+        return total > 0 ? (float) curedCount / total : (cured ? 1.0F : 0.0F);
     }
 
     @Override
     protected void onFormed(com.jokerdayn.swindustry.multiblock.MultiblockInstance instance) {
         status = KilnStatus.IDLE;
-        if (level != null && !level.isClientSide) {
-            level.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.PLAYER_LEVELUP,
-                net.minecraft.sounds.SoundSource.BLOCKS, 0.65F, 1.25F);
-            level.playSound(null, worldPosition, net.minecraft.sounds.SoundEvents.ANVIL_PLACE,
-                net.minecraft.sounds.SoundSource.BLOCKS, 0.50F, 0.85F);
+        if (level != null) {
+            boolean hasRaw = false;
+            for (BlockPos pos : instance.walls()) {
+                if (!pos.equals(worldPosition) && level.getBlockState(pos).is(ModBlocks.RAW_CLAY_BRICKS.get())) {
+                    hasRaw = true;
+                    break;
+                }
+            }
+            this.cured = !hasRaw;
         }
     }
 
@@ -281,10 +334,15 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 kiln.litTime--;
             }
             if (kiln.isLit()) {
-                if (kiln.heat < MAX_HEAT) {
-                    kiln.heat = Math.min(MAX_HEAT, kiln.heat + 2);
+                int effectiveMax = kiln.effectiveMaxHeat();
+                if (kiln.heat < effectiveMax) {
+                    kiln.heat = Math.min(effectiveMax, kiln.heat + 2);
+                    dirty = true;
+                } else if (kiln.heat > effectiveMax) {
+                    kiln.heat = Math.max(effectiveMax, kiln.heat - 1);
                     dirty = true;
                 }
+                dirty = kiln.tickCuring(level) || dirty;
             } else {
                 if (kiln.heat > 0) {
                     kiln.heat = Math.max(0, kiln.heat - 1);
@@ -384,6 +442,107 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         return true;
     }
 
+    /**
+     * Cellular automaton chain reaction:
+     * Fires raw clay bricks into cured clay bricks in fast propagating waves spreading from the
+     * heat source outward to the entire kiln.
+     */
+    private boolean tickCuring(Level level) {
+        if (level.isClientSide || !isLit() || !isFormed()) {
+            return false;
+        }
+
+        MultiblockInstance instance = instance();
+        if (instance == null) {
+            return false;
+        }
+
+        curingProgress++;
+        if (curingProgress < WAVE_INTERVAL) {
+            return false;
+        }
+        curingProgress = 0;
+
+        List<BlockPos> rawBricks = new ArrayList<>();
+        List<BlockPos> curedBricks = new ArrayList<>();
+
+        for (BlockPos wallPos : instance.walls()) {
+            if (wallPos.equals(worldPosition)) {
+                continue;
+            }
+            BlockState wallState = level.getBlockState(wallPos);
+            if (wallState.is(ModBlocks.RAW_CLAY_BRICKS.get())) {
+                rawBricks.add(wallPos);
+            } else if (wallState.is(ModBlocks.CLAY_BRICKS.get())) {
+                curedBricks.add(wallPos);
+            }
+        }
+
+        if (rawBricks.isEmpty()) {
+            if (!cured) {
+                cured = true;
+                return true;
+            }
+            return false;
+        }
+
+        List<BlockPos> toCure = new ArrayList<>();
+
+        if (curedBricks.isEmpty()) {
+            // Seed wave: find raw bricks with the lowest Y level (the floor)
+            int minY = Integer.MAX_VALUE;
+            for (BlockPos pos : rawBricks) {
+                minY = Math.min(minY, pos.getY());
+            }
+            for (BlockPos pos : rawBricks) {
+                if (pos.getY() == minY) {
+                    toCure.add(pos);
+                }
+            }
+            // Fallback: if no floor bricks, grab raw bricks closest to the cavity center
+            if (toCure.isEmpty()) {
+                Vec3 center = instance.cavityCenter();
+                for (BlockPos pos : rawBricks) {
+                    if (pos.distToCenterSqr(center.x, center.y, center.z) <= 6.0) {
+                        toCure.add(pos);
+                    }
+                }
+            }
+        } else {
+            // Propagation wave: any raw brick adjacent to at least one already cured brick
+            for (BlockPos rawPos : rawBricks) {
+                boolean adjacentToCured = false;
+                for (BlockPos curedPos : curedBricks) {
+                    int dx = Math.abs(rawPos.getX() - curedPos.getX());
+                    int dy = Math.abs(rawPos.getY() - curedPos.getY());
+                    int dz = Math.abs(rawPos.getZ() - curedPos.getZ());
+                    if (dx <= 1 && dy <= 1 && dz <= 1 && (dx + dy + dz > 0)) {
+                        adjacentToCured = true;
+                        break;
+                    }
+                }
+                if (adjacentToCured) {
+                    toCure.add(rawPos);
+                }
+            }
+        }
+
+        if (toCure.isEmpty()) {
+            toCure.add(rawBricks.get(0));
+        }
+
+        // Transform the wave of candidate bricks into cured clay bricks
+        for (BlockPos pos : toCure) {
+            level.setBlock(pos, ModBlocks.CLAY_BRICKS.get().defaultBlockState(), Block.UPDATE_ALL);
+        }
+
+        if (rawBricks.size() <= toCure.size()) {
+            cured = true;
+        }
+
+        return true;
+    }
+
     private void consumeFuel(Level level, ItemStack fuel) {
         ItemStack remainingFuel = fuel.copy();
         remainingFuel.shrink(1);
@@ -480,7 +639,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             SmeltingRecipe recipe = holder.value();
             int time = scaledFurnaceCookingTime(recipe.getCookingTime());
             return new Job("smelting:" + holder.id(), recipe.assemble(recipeInput, level.registryAccess()),
-                time, recipe.getExperience(), KilnRecipe.TIER_CLAY);
+                time, recipe.getExperience(), 0);
         }
 
         return null;
@@ -595,6 +754,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             ? Math.max(1, tag.getInt(KEY_COOK_DURATION))
             : KilnRecipe.DEFAULT_COOKING_TIME;
         cookProgress = Mth.clamp(tag.getInt(KEY_COOK_PROGRESS), 0, cookDuration - 1);
+        curingProgress = Math.max(0, tag.getInt(KEY_CURING_PROGRESS));
+        cured = tag.getBoolean(KEY_CURED);
         float loadedExperience = tag.getFloat(KEY_EXPERIENCE);
         storedExperience = Float.isFinite(loadedExperience) && loadedExperience >= 0.0F
             ? loadedExperience
@@ -613,6 +774,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         tag.putInt(KEY_LIT_DURATION, litDuration);
         tag.putInt(KEY_COOK_PROGRESS, cookProgress);
         tag.putInt(KEY_COOK_DURATION, cookDuration);
+        tag.putInt(KEY_CURING_PROGRESS, curingProgress);
+        tag.putBoolean(KEY_CURED, cured);
         tag.putFloat(KEY_EXPERIENCE, storedExperience);
         tag.putInt(KEY_HEAT, heat);
         if (cookProgress > 0 && activeJobKey != null) {

@@ -17,12 +17,12 @@ import com.jokerdayn.swindustry.registry.ModTags;
  * they surround.</p>
  *
  * <pre>
- *   y = 3..5      y = 2        y = 0..1
- *    · · · · ·   · · · · ·    · ▓ P ▓ ·      ▓  raw clay bricks
- *    · · ▓ · ·   · ▓ ▓ ▓ ·    ▓ · · · ▓      P  loading port (the controller)
- *    · ▓ · ▓ ·   · ▓ · ▓ ·    ▓ · · · ▓      ·  outside the kiln
- *    · · ▓ · ·   · ▓ ▓ ▓ ·    ▓ · · · ▓
- *    · · · · ·   · · · · ·    · ▓ ▓ ▓ ·
+ *   y = 4         y = 3        y = 1..2     y = 0 (Floor)
+ *    · · · · ·   · · · · ·    · ▓ P ▓ ·    · ▓ ▓ ▓ ·      ▓  raw clay bricks
+ *    · · ▓ · ·   · ▓ ▓ ▓ ·    ▓ · · · ▓    ▓ ▓ ▓ ▓ ▓      P  loading port (controller at y=1)
+ *    · ▓ · ▓ ·   · ▓ · ▓ ·    ▓ · · · ▓    ▓ ▓ ▓ ▓ ▓      ·  outside the kiln
+ *    · · ▓ · ·   · ▓ ▓ ▓ ·    ▓ · · · ▓    ▓ ▓ ▓ ▓ ▓
+ *    · · · · ·   · · · · ·    · ▓ ▓ ▓ ·    · ▓ ▓ ▓ ·
  * </pre>
  *
  * <p>Written as if the port faced north; the framework handles the other three facings. The shell

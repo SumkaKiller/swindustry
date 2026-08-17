@@ -66,7 +66,15 @@ class NbtWriter:
 
 def build_kiln_nbt():
     layers = [
-        # y = 0
+        # y = 0 (Full brick floor)
+        [
+            " CCC ",
+            "CCCCC",
+            "CCCCC",
+            "CCCCC",
+            " CCC "
+        ],
+        # y = 1 (Port + lower chamber)
         [
             " CPC ",
             "C___C",
@@ -74,7 +82,7 @@ def build_kiln_nbt():
             "C___C",
             " CCC "
         ],
-        # y = 1
+        # y = 2 (Upper chamber)
         [
             " CCC ",
             "C___C",
@@ -82,7 +90,7 @@ def build_kiln_nbt():
             "C___C",
             " CCC "
         ],
-        # y = 2
+        # y = 3 (Dome)
         [
             "     ",
             " CCC ",
@@ -90,23 +98,7 @@ def build_kiln_nbt():
             " CCC ",
             "     "
         ],
-        # y = 3
-        [
-            "     ",
-            "  C  ",
-            " C_C ",
-            "  C  ",
-            "     "
-        ],
-        # y = 4
-        [
-            "     ",
-            "  C  ",
-            " C_C ",
-            "  C  ",
-            "     "
-        ],
-        # y = 5
+        # y = 4 (1-block tall chimney)
         [
             "     ",
             "  C  ",
@@ -131,7 +123,7 @@ def build_kiln_nbt():
     }
 
     size_x = 5
-    size_y = 6
+    size_y = 5
     size_z = 5
 
     blocks = []

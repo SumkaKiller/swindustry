@@ -38,6 +38,10 @@ public final class ModItems {
         "raw_clay_bricks",
         () -> new BlockItem(ModBlocks.RAW_CLAY_BRICKS.get(), new Item.Properties()));
 
+    public static final DeferredHolder<Item, BlockItem> CLAY_BRICKS = ITEMS.register(
+        "clay_bricks",
+        () -> new BlockItem(ModBlocks.CLAY_BRICKS.get(), new Item.Properties()));
+
     public static final DeferredHolder<Item, BlockItem> CLAY_KILN_PORT = ITEMS.register(
         "clay_kiln_port",
         () -> new BlockItem(ModBlocks.CLAY_KILN_PORT.get(), new Item.Properties()));

@@ -50,6 +50,17 @@ public final class ModBlocks {
             .sound(SoundType.MUD_BRICKS))
     );
 
+    /**
+     * Fired clay bricks, hardened by the heat of the kiln.
+     */
+    public static final DeferredBlock<MultiblockPartBlock> CLAY_BRICKS = BLOCKS.register(
+        "clay_bricks",
+        () -> new MultiblockPartBlock(BlockBehaviour.Properties.of()
+            .mapColor(MapColor.COLOR_RED)
+            .strength(1.5f, 5.0f)
+            .sound(SoundType.MUD_BRICKS))
+    );
+
     /** The mouth of the kiln, and the only part of it that thinks. */
     public static final DeferredBlock<ClayKilnPortBlock> CLAY_KILN_PORT = BLOCKS.register(
         "clay_kiln_port",

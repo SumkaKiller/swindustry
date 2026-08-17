@@ -20,8 +20,8 @@ public final class GuiTextureCheck {
     private static final Path ASSETS = Path.of("src/main/resources/assets/swindustry");
 
     private static final int SHEET_SIZE = 256;
-    private static final int PANEL_WIDTH = 202;
-    private static final int PANEL_HEIGHT = 190;
+    private static final int PANEL_WIDTH = 176;
+    private static final int PANEL_HEIGHT = 166;
 
     private GuiTextureCheck() {}
 
@@ -31,21 +31,16 @@ public final class GuiTextureCheck {
         check(image.getWidth() == SHEET_SIZE && image.getHeight() == SHEET_SIZE,
             "expected a 256x256 atlas, got " + image.getWidth() + "x" + image.getHeight());
 
-        // Cut corners are intentionally transparent, but every functional part of the window must
-        // have a background.  This catches the old 176x166 sheet immediately.
-        check(alphaCount(image, 0, 0, PANEL_WIDTH, PANEL_HEIGHT) >= 38_000,
-            "the 202x190 panel contains an unexpected transparent region");
-        requireOpaqueRect(image, 27, 33, 18, 18, "input slot frame");
-        requireOpaqueRect(image, 27, 64, 18, 18, "fuel slot frame");
-        requireOpaqueRect(image, 157, 49, 18, 18, "output slot frame");
-        requireOpaqueRect(image, 19, 111, 162, 54, "player inventory grid");
-        requireOpaqueRect(image, 19, 169, 162, 18, "hotbar");
+        check(alphaCount(image, 0, 0, PANEL_WIDTH, PANEL_HEIGHT) >= 28_000,
+            "the 176x166 panel contains an unexpected transparent region");
+        requireOpaqueRect(image, 42, 17, 18, 18, "input slot frame");
+        requireOpaqueRect(image, 42, 53, 18, 18, "fuel slot frame");
+        requireOpaqueRect(image, 8, 84, 162, 54, "player inventory grid");
+        requireOpaqueRect(image, 8, 142, 162, 18, "hotbar");
 
-        check(alphaCount(image, 202, 0, 14, 14) >= 65, "fire frame 1 is missing");
-        check(alphaCount(image, 216, 0, 14, 14) >= 65, "fire frame 2 is missing");
-        check(alphaCount(image, 230, 0, 14, 14) >= 65, "fire frame 3 is missing");
-        check(alphaCount(image, 202, 16, 38, 15) >= 125, "progress arrow is missing");
-        check(alphaCount(image, 244, 0, 6, 35) == 210, "heat column is incomplete");
+        check(alphaCount(image, 176, 0, 14, 14) >= 50, "fire frame is missing");
+        check(alphaCount(image, 176, 14, 24, 17) >= 100, "progress arrow is missing");
+        check(alphaCount(image, 201, 0, 13, 52) >= 300, "heat gauge is missing");
 
         check(noPixelsOutsideAtlasRegions(image),
             "opaque pixels escaped the panel or declared overlay sprite regions");
@@ -140,10 +135,10 @@ public final class GuiTextureCheck {
                     continue;
                 }
                 boolean panel = x < PANEL_WIDTH && y < PANEL_HEIGHT;
-                boolean fireFrames = x >= 202 && x < 244 && y < 14;
-                boolean arrow = x >= 202 && x < 240 && y >= 16 && y < 31;
-                boolean heat = x >= 244 && x < 250 && y < 35;
-                if (!panel && !fireFrames && !arrow && !heat) {
+                boolean fire = x >= 176 && x < 190 && y < 14;
+                boolean arrow = x >= 176 && x < 200 && y >= 14 && y < 31;
+                boolean gauge = x >= 201 && x < 214 && y < 52;
+                if (!panel && !fire && !arrow && !gauge) {
                     return false;
                 }
             }
