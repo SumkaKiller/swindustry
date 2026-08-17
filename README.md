@@ -89,7 +89,7 @@ blocks that are no longer there.
 | `raw_clay_bricks` | the kiln's shell, tagged `swindustry:kiln_wall` |
 | `clay_kiln_port` | the kiln's mouth and its controller |
 | `drafting_table` | paper, soot ink and a reusable controller sample become a machine blueprint |
-| primitive engineer's goggles | an early wooden sighting frame that projects the selected blueprint layer by layer |
+| primitive engineer's goggles | an early wooden sighting frame that outlines unfinished multiblock structures |
 | clay kiln blueprint | reusable plan; clips into worn or held goggles without being consumed |
 | `soot` | campfire residue and the drafting table's first ink |
 | bronze tools and armour | tier between stone and iron, but with iron's mining level — see `ModToolTiers` |
@@ -109,11 +109,13 @@ port as its sample. Paper and soot are spent; the expensive port is returned unt
 is a reusable blueprint. Wear the goggles and use the blueprint (or combine both in a crafting
 grid) to install it, then sneak-use the matching controller.
 
-The projection sweeps upward one layer at a time and is sent only to the inspecting player: green
-marks correct walls, cyan marks blocks to place, and red marks cavities that must be cleared.
-Walking away, logging out or starting another inspection cleans it up automatically.
+Wearing the goggles draws the unfinished machine in-world: translucent ghost blocks mark positions
+to fill, red boxes mark cavities that must stay clear, and cyan outlines trace every missing wall.
+The preview is derived locally from the same immutable patterns the server matches against, so it
+never needs a packet of its own.
 
-The clay kiln is `KilnPatterns.CLAY_KILN`: 43 bricks and a loading port, taken block for block from
+The kiln is `KilnPatterns.CLAY_KILN`: 56 clay bricks and the loading port, taken block for block
+from
 `furnace.nbt`. A 3×3×2 firebox with the corners knocked off, drawing in to a throat and a
 three-block flue. It runs ordinary `minecraft:smelting` recipes — the pack removes the vanilla
 furnace, so it has to be able to cook a fish — plus its own `swindustry:kiln` type for the things

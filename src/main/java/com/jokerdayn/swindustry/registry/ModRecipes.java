@@ -1,13 +1,11 @@
 package com.jokerdayn.swindustry.registry;
 
 import com.jokerdayn.swindustry.SWIndustry;
-import com.jokerdayn.swindustry.blueprint.GoggleCalibrationRecipe;
 import com.jokerdayn.swindustry.blueprint.DraftingRecipe;
 import com.jokerdayn.swindustry.kiln.KilnRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.crafting.SimpleCraftingRecipeSerializer;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
@@ -38,10 +36,6 @@ public final class ModRecipes {
 
     public static final DeferredHolder<RecipeSerializer<?>, DraftingRecipe.Serializer> DRAFTING_SERIALIZER =
         RECIPE_SERIALIZERS.register("drafting", DraftingRecipe.Serializer::new);
-
-    public static final DeferredHolder<RecipeSerializer<?>, SimpleCraftingRecipeSerializer<GoggleCalibrationRecipe>>
-        GOGGLE_CALIBRATION_SERIALIZER = RECIPE_SERIALIZERS.register(
-            "goggle_calibration", () -> new SimpleCraftingRecipeSerializer<>(GoggleCalibrationRecipe::new));
 
     private ModRecipes() {}
 

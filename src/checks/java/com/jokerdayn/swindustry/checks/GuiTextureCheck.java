@@ -108,13 +108,8 @@ public final class GuiTextureCheck {
             "container.swindustry.clay_kiln.slot.fuel",
             "container.swindustry.clay_kiln.slot.output",
             "container.swindustry.clay_kiln.burn_time",
-            "container.swindustry.clay_kiln.hint.incomplete",
-            "container.swindustry.clay_kiln.hint.idle",
-            "container.swindustry.clay_kiln.hint.invalid_recipe",
-            "container.swindustry.clay_kiln.hint.needs_fuel",
-            "container.swindustry.clay_kiln.hint.output_blocked",
-            "container.swindustry.clay_kiln.hint.tier_too_low",
-            "container.swindustry.clay_kiln.hint.working"
+            "container.swindustry.clay_kiln.progress",
+            "container.swindustry.clay_kiln.heat_title"
         );
         for (String locale : Set.of("en_us", "ru_ru")) {
             Path languageFile = ASSETS.resolve("lang/" + locale + ".json");

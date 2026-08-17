@@ -19,7 +19,7 @@ import org.jetbrains.annotations.Nullable;
 /**
  * The three slots of the loading port, plus the player's own pockets.
  *
- * <p>Laid out like a furnace on purpose. The kiln is strange enough already — forty-four blocks and
+ * <p>Laid out like a furnace on purpose. The kiln is strange enough already — fifty-seven blocks and
  * a flue — so the one screen a player looks at should not also be a puzzle.</p>
  */
 public class ClayKilnMenu extends AbstractContainerMenu {
@@ -194,7 +194,7 @@ public class ClayKilnMenu extends AbstractContainerMenu {
     }
 
     public int tier() {
-        return Math.max(KilnRecipe.TIER_CLAY, data.get(ClayKilnBlockEntity.DATA_TIER));
+        return data.get(ClayKilnBlockEntity.DATA_TIER);
     }
 
     public int fuelTicksRemaining() {

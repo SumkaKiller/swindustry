@@ -13,7 +13,7 @@ import com.jokerdayn.swindustry.registry.ModTags;
  *
  * <p>Taken block for block from the kiln built in-game and exported to {@code furnace.nbt}: a
  * five-by-five firebox with the corners knocked off, two courses high, drawing in to a three-wide
- * throat and then a single flue running three blocks up. Forty-three bricks and the loading port
+ * throat and then a single flue running three blocks up. Fifty-six bricks and the loading port
  * they surround.</p>
  *
  * <pre>

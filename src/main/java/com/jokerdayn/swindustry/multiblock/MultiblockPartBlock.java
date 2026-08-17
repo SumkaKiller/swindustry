@@ -9,7 +9,7 @@ import net.minecraft.world.level.block.state.BlockState;
  * A plain block that knows to tell its machine when it is taken away.
  *
  * <p>Part blocks stay dumb on purpose: no block entity, no stored owner, nothing to keep in sync.
- * A wall of forty-three of these costs exactly as much as forty-three of any other block. The only
+ * A wall of fifty-six of these costs exactly as much as fifty-six of any other block. The only
  * thing this class adds is the notification on removal, which is what lets a machine notice damage
  * immediately instead of on its next scheduled check.</p>
  */

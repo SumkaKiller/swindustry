@@ -37,7 +37,7 @@ public final class ModBlocks {
     );
 
     /**
-     * Clay, shaped and dried but never fired. Forty-three of them make a kiln.
+     * Clay, shaped and dried but never fired. Fifty-six of them make a kiln.
      *
      * <p>A {@link MultiblockPartBlock}, which is the whole of its cleverness: it holds no data and
      * costs nothing extra, it just tells any machine it belonged to when a player takes it away.</p>

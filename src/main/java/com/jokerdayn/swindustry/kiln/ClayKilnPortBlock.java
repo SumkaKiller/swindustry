@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
  * The mouth of the kiln, and the one block of it that thinks.
  *
  * <p>Everything a player does with a kiln happens here: what goes in, what comes out, and whether
- * the pile of bricks around it is actually a kiln yet. The other forty-three blocks are just
+ * the pile of bricks around it is actually a kiln yet. The other fifty-six blocks are just
  * bricks.</p>
  *
  * <p>It faces out of the structure, so you stand in front of the hole and the kiln is behind
