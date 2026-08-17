@@ -65,6 +65,14 @@ public final class MultiblockPattern {
     /** Distinct matchers used by wall cells, controller included. Keeps reverse lookups cheap. */
     private final Set<BlockMatcher> wallMatchers;
 
+    /**
+     * Per-facing offset tables indexed by {@link #HORIZONTALS} ordinal, precomputed once so the
+     * hot evaluation path never multiplies vectors or allocates positions per cell. Entry {@code k}
+     * of a rotated table corresponds to entry {@code k} of the authored list it came from.
+     */
+    private final Vec3i[][] rotatedWallTables;
+    private final Vec3i[][] rotatedCavityTables;
+
     private final Vec3i size;
     private final char controllerChar;
 
@@ -133,6 +141,22 @@ public final class MultiblockPattern {
         this.wallOffsets = List.copyOf(walls);
         this.cavityOffsets = List.copyOf(cavities);
         this.wallMatchers = Set.copyOf(wallMatcherSet);
+
+        this.rotatedWallTables = new Vec3i[HORIZONTALS.length][];
+        this.rotatedCavityTables = new Vec3i[HORIZONTALS.length][];
+        for (int i = 0; i < HORIZONTALS.length; i++) {
+            this.rotatedWallTables[i] = rotateAll(this.wallOffsets, HORIZONTALS[i]);
+            this.rotatedCavityTables[i] = rotateAll(this.cavityOffsets, HORIZONTALS[i]);
+        }
+    }
+
+    private Vec3i[] rotateAll(List<Vec3i> offsets, Direction facing) {
+        Vec3i[] out = new Vec3i[offsets.size()];
+        for (int k = 0; k < out.length; k++) {
+            BlockPos world = toWorld(BlockPos.ZERO, facing, offsets.get(k));
+            out[k] = new Vec3i(world.getX(), world.getY(), world.getZ());
+        }
+        return out;
     }
 
     /**
@@ -196,31 +220,41 @@ public final class MultiblockPattern {
             return new MatchResult(true, Optional.empty());
         }
 
+        int facingOrdinal = facingOrdinal(facing);
+        Vec3i[] wallTable = rotatedWallTables[facingOrdinal];
+        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         Set<BlockPos> walls = new LinkedHashSet<>(wallOffsets.size() + 1);
-        walls.add(controllerPos);
-        for (Vec3i offset : wallOffsets) {
-            BlockPos pos = toWorld(controllerPos, facing, offset);
-            CellResult result = testCell(level, pos, offset);
+        walls.add(controllerPos.immutable());
+        for (int k = 0; k < wallTable.length; k++) {
+            Vec3i rel = wallTable[k];
+            cursor.set(controllerPos.getX() + rel.getX(),
+                controllerPos.getY() + rel.getY(),
+                controllerPos.getZ() + rel.getZ());
+            CellResult result = testCell(level, cursor, wallOffsets.get(k));
             if (result == CellResult.CHUNK_UNAVAILABLE) {
                 return new MatchResult(false, Optional.empty());
             }
             if (result == CellResult.MISMATCH) {
                 return new MatchResult(true, Optional.empty());
             }
-            walls.add(pos);
+            walls.add(cursor.immutable());
         }
 
         Set<BlockPos> cavity = new LinkedHashSet<>(cavityOffsets.size());
-        for (Vec3i offset : cavityOffsets) {
-            BlockPos pos = toWorld(controllerPos, facing, offset);
-            CellResult result = testCell(level, pos, offset);
+        Vec3i[] cavityTable = rotatedCavityTables[facingOrdinal];
+        for (int k = 0; k < cavityTable.length; k++) {
+            Vec3i rel = cavityTable[k];
+            cursor.set(controllerPos.getX() + rel.getX(),
+                controllerPos.getY() + rel.getY(),
+                controllerPos.getZ() + rel.getZ());
+            CellResult result = testCell(level, cursor, cavityOffsets.get(k));
             if (result == CellResult.CHUNK_UNAVAILABLE) {
                 return new MatchResult(false, Optional.empty());
             }
             if (result == CellResult.MISMATCH) {
                 return new MatchResult(true, Optional.empty());
             }
-            cavity.add(pos);
+            cavity.add(cursor.immutable());
         }
 
         MultiblockInstance instance = new MultiblockInstance(controllerPos, facing,
@@ -354,6 +388,20 @@ public final class MultiblockPattern {
     @FunctionalInterface
     public interface CellConsumer {
         void accept(Vec3i offset, char symbol, BlockMatcher matcher);
+    }
+
+    int facingOrdinal(Direction facing) {
+        for (int i = 0; i < HORIZONTALS.length; i++) {
+            if (HORIZONTALS[i] == facing) {
+                return i;
+            }
+        }
+        throw new IllegalArgumentException("Not a horizontal facing: " + facing);
+    }
+
+    /** Authored-order wall offsets already rotated into {@code facing}; parity hook for checks. */
+    public List<Vec3i> rotatedWallTable(Direction facing) {
+        return List.of(rotatedWallTables[facingOrdinal(facing)]);
     }
 
     private static void requireHorizontal(Direction facing) {

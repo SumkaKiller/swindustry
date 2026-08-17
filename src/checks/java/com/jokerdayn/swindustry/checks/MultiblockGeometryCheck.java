@@ -85,6 +85,7 @@ public final class MultiblockGeometryCheck {
         checkRotations(kiln, walls, cavity);
         checkReverseLookup(kiln, walls);
         checkShellSymmetry(walls, controllerCells.get(0));
+        checkRotationTables(kiln, walls);
 
         if (failures.isEmpty()) {
             System.out.println("\nmultiblock geometry: all checks passed");
@@ -197,6 +198,45 @@ public final class MultiblockGeometryCheck {
             Vec3i turned = new Vec3i(-dz, offset.getY(), dx + axisZ);
             check("shell is symmetric under a quarter turn", shell.contains(turned),
                 offset + " turns to " + turned + ", which is not part of the shell");
+        }
+    }
+
+    /**
+     * The hot matching path walks precomputed per-facing tables; this pins them to the reference
+     * {@code toWorld} transform cell-for-cell, so a table bug can never ship as a subtle
+     * "the kiln only works facing west" report.
+     */
+    private static void checkRotationTables(MultiblockPattern kiln, List<Vec3i> walls) {
+        // Tables are built over wallOffsets, which excludes the controller cell; mirror that here.
+        List<Vec3i> members = new ArrayList<>();
+        for (Vec3i offset : walls) {
+            if (!offset.equals(Vec3i.ZERO)) {
+                members.add(offset);
+            }
+        }
+        for (Direction facing : HORIZONTALS) {
+            List<Vec3i> expected = new ArrayList<>(members.size());
+            for (Vec3i offset : members) {
+                expected.add(kiln.toWorld(BlockPos.ZERO, facing, offset));
+            }
+            List<Vec3i> actual = kiln.rotatedWallTable(facing);
+            String detail;
+            if (actual.size() != expected.size()) {
+                detail = "size " + actual.size() + " vs " + expected.size();
+            } else {
+                int bad = -1;
+                for (int i = 0; i < actual.size(); i++) {
+                    if (!actual.get(i).equals(expected.get(i))) {
+                        bad = i;
+                        break;
+                    }
+                }
+                detail = bad < 0 ? "lists equal but equals() returned false"
+                    : "index " + bad + ": table " + actual.get(bad) + " vs reference "
+                        + expected.get(bad) + " (authored " + members.get(bad) + ")";
+            }
+            check("facing " + facing + ": rotated wall table matches the reference transform",
+                detail.startsWith("lists equal"), detail);
         }
     }
 

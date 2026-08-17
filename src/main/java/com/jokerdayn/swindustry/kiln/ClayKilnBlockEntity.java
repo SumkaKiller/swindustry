@@ -103,6 +103,10 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private final List<ScheduledBrick> curingSchedule = new ArrayList<>();
     private int scheduleIndex;
 
+    /** Weather sampled at most twice a second: {@code isRainingAt} walks the heightmap. */
+    private boolean rainingCache;
+    private long rainingSampledAt = Long.MIN_VALUE;
+
     private final ItemStackHandler items = new ItemStackHandler(SLOT_COUNT) {
         @Override
         protected void onContentsChanged(int slot) {
@@ -525,6 +529,19 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     }
 
     /**
+     * Weather is global and changes rarely; one sample every two seconds replaces a heightmap
+     * walk per pending brick per tick during the whole curing window.
+     */
+    private boolean sampledRaining(Level level) {
+        long now = level.getGameTime();
+        if (rainingSampledAt > now || now - rainingSampledAt >= 40) {
+            rainingSampledAt = now;
+            rainingCache = level.isRainingAt(worldPosition.above());
+        }
+        return rainingCache;
+    }
+
+    /**
      * Thermodynamic curing progression:
      * Fires raw clay bricks into cured ceramic clay bricks smoothly across their thermal exposure
      * zones (~155-210 seconds / 3100-4200 ticks) from the combustion chamber out to the vault,
@@ -549,13 +566,14 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         curingProgress++;
 
         boolean changed = false;
+        boolean raining = sampledRaining(level);
         while (scheduleIndex < curingSchedule.size()) {
             ScheduledBrick next = curingSchedule.get(scheduleIndex);
             BlockPos targetPos = next.pos();
 
-            // Rain modifier: rain falling on exposed exterior bricks cools them, requiring +30% curing time
+            // Rain modifier: exposed bricks cure ~30% slower while any rain falls on the kiln.
             int requiredTicks = next.cureTick();
-            if (level.isRainingAt(targetPos)) {
+            if (raining) {
                 requiredTicks = (int) (requiredTicks * 1.30F);
                 if (level.random.nextInt(40) == 0 && level instanceof ServerLevel serverLevel) {
                     serverLevel.sendParticles(ParticleTypes.SMOKE,
@@ -821,7 +839,14 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
 
     /** Used by slots and shift-click routing so obvious non-recipes never clog the input. */
     public boolean canProcess(ItemStack stack) {
-        return !stack.isEmpty() && (level == null || findJob(level, stack) != null);
+        if (stack.isEmpty()) {
+            return false;
+        }
+        // Existence-only probe: building full jobs here would copy result stacks on every
+        // simulated hopper insertion just to throw them away.
+        SingleRecipeInput input = new SingleRecipeInput(stack);
+        return kilnRecipes.getRecipeFor(input, level).isPresent()
+            || furnaceRecipes.getRecipeFor(input, level).isPresent();
     }
 
     /** One unit of work the kiln has agreed to do, flattened out of whichever recipe described it. */

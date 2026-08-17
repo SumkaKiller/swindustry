@@ -29,6 +29,22 @@ public class PrimitiveCampfireBlockEntity extends BlockEntity {
     private int burnTicks;
     private final CampfireIgnition ignition = new CampfireIgnition();
 
+    /** Weather sampled at most twice a second; {@code isRainingAt} walks the heightmap. */
+    private boolean rainingCache;
+    private long rainingSampledAt = Long.MIN_VALUE;
+
+    private boolean sampledRaining(Level level, BlockPos pos) {
+        if (!Config.RAIN_EXTINGUISHES_CAMPFIRE.get()) {
+            return false;
+        }
+        long now = level.getGameTime();
+        if (rainingSampledAt > now || now - rainingSampledAt >= 40) {
+            rainingSampledAt = now;
+            rainingCache = level.isRainingAt(pos.above());
+        }
+        return rainingCache;
+    }
+
     public PrimitiveCampfireBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.PRIMITIVE_CAMPFIRE.get(), pos, state);
     }
@@ -64,7 +80,7 @@ public class PrimitiveCampfireBlockEntity extends BlockEntity {
     }
 
     public static void serverTick(Level level, BlockPos pos, BlockState state, PrimitiveCampfireBlockEntity campfire) {
-        if (Config.RAIN_EXTINGUISHES_CAMPFIRE.get() && level.isRainingAt(pos.above())) {
+        if (campfire.sampledRaining(level, pos)) {
             campfire.burnTicks = 0;
             campfire.resetStrikeAttempts();
             level.setBlock(pos, state.setValue(PrimitiveCampfireBlock.STAGE, CampfireStage.UNLIT), Block.UPDATE_ALL);
