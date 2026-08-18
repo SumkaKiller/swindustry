@@ -45,7 +45,7 @@ public class SWIndustry {
         ModArmorMaterials.register(modEventBus);
         ModCreativeTabs.register(modEventBus);
 
-        modContainer.registerConfig(ModConfig.Type.COMMON, Config.SPEC);
+        modContainer.registerConfig(ModConfig.Type.SERVER, Config.SPEC);
     }
 
     public static ResourceLocation id(String path) {

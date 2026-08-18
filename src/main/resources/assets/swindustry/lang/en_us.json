@@ -73,12 +73,13 @@
   "message.swindustry.blueprint.calibrated": "Plan installed: %s",
 
   "swindustry.configuration.title": "SW: Industry",
-  "swindustry.configuration.section.swindustry.common.toml": "SW: Industry",
-  "swindustry.configuration.section.swindustry.common.toml.title": "SW: Industry",
+  "swindustry.configuration.section.swindustry.server.toml": "SW: Industry",
+  "swindustry.configuration.section.swindustry.server.toml.title": "SW: Industry",
   "swindustry.configuration.strikeCooldown": "Ticks between strikes",
   "swindustry.configuration.requireDistinctStrikers": "Require flint and stone specifically",
   "swindustry.configuration.campfireBurnTicks": "Campfire burn duration in ticks",
   "swindustry.configuration.rainExtinguishes": "Rain puts the campfire out",
   "swindustry.configuration.kilnCookTicks": "Base kiln cook time in ticks",
-  "swindustry.configuration.kilnFuelEfficiency": "Fuel duration multiplier"
+  "swindustry.configuration.kilnFuelEfficiency": "Fuel duration multiplier",
+  "swindustry.configuration.enableSpawnCommands": "Register debug spawn commands"
 }

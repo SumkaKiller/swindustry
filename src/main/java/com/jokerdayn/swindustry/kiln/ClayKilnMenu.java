@@ -1,5 +1,6 @@
 package com.jokerdayn.swindustry.kiln;
 
+import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.jokerdayn.swindustry.registry.ModMenus;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -7,6 +8,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
@@ -31,6 +33,7 @@ public class ClayKilnMenu extends AbstractContainerMenu {
 
     private final IItemHandler kiln;
     private final ContainerData data;
+    private final ContainerLevelAccess access;
     @Nullable
     private final ClayKilnBlockEntity blockEntity;
     private final BlockPos pos;
@@ -43,6 +46,7 @@ public class ClayKilnMenu extends AbstractContainerMenu {
         this.data = data;
         this.blockEntity = blockEntity;
         this.pos = blockEntity.getBlockPos();
+        this.access = ContainerLevelAccess.create(blockEntity.getLevel(), blockEntity.getBlockPos());
 
         checkContainerDataCount(data, ClayKilnBlockEntity.DATA_COUNT);
         addKilnSlots();
@@ -65,6 +69,9 @@ public class ClayKilnMenu extends AbstractContainerMenu {
         this.blockEntity = found;
         this.kiln = found != null ? found.itemHandler() : new ItemStackHandler(KILN_SLOTS);
         this.data = new SimpleContainerData(ClayKilnBlockEntity.DATA_COUNT);
+        this.access = found != null
+            ? ContainerLevelAccess.create(playerInventory.player.level(), pos)
+            : ContainerLevelAccess.NULL;
 
         addKilnSlots();
         addPlayerSlots(playerInventory);
@@ -209,11 +216,9 @@ public class ClayKilnMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(Player player) {
-        if (blockEntity == null || blockEntity.isRemoved()) {
-            return false;
-        }
-        return player.level().getBlockEntity(pos) == blockEntity
-            && player.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5) <= 64.0;
+        // Vanilla furnace semantics: type-checked against live world state, so a chunk reload
+        // that recreates the block entity no longer closes the screen.
+        return stillValid(access, player, ModBlocks.CLAY_KILN_PORT.get());
     }
 
     @Override

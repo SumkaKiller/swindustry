@@ -1,5 +1,6 @@
 package com.jokerdayn.swindustry.client;
 
+import com.jokerdayn.swindustry.Config;
 import com.jokerdayn.swindustry.SWIndustry;
 import com.jokerdayn.swindustry.registry.ModMenus;
 import com.mojang.blaze3d.platform.InputConstants;
@@ -49,9 +50,12 @@ public final class SWIndustryClient {
 
         @SubscribeEvent
         public static void onClientTick(ClientTickEvent.Post event) {
+            if (!Config.DEBUG_SPAWN_COMMANDS.get()) {
+                return;
+            }
             Minecraft mc = Minecraft.getInstance();
             if (SPAWN_KILN_KEY.consumeClick() && mc.player != null && mc.player.connection != null) {
-                mc.player.connection.sendCommand("spawn_kiln");
+                mc.player.connection.sendCommand("swindustry spawn_kiln");
             }
         }
     }

@@ -3,10 +3,11 @@ package com.jokerdayn.swindustry;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 /**
- * Common config. Everything a pack maker would want to retune without recompiling — how stubborn
- * how long the first fire lasts and what it leaves behind — lives here rather than as a constant
- * buried in a block class. The five-step ignition progression is defined by {@code CampfireIgnition}
- * because it is gameplay logic rather than a pack tuning knob.
+ * Server config: synced to clients automatically, so gameplay predicates read the same values on
+ * both logical sides. Everything a pack maker would want to retune without recompiling — how
+ * stubborn striking is, how long the first fire lasts and what it leaves behind — lives here
+ * rather than as a constant buried in a block class. The five-step ignition progression is defined
+ * by {@code CampfireIgnition} because it is gameplay logic rather than a tuning knob.
  */
 public final class Config {
 
@@ -51,6 +52,14 @@ public final class Config {
         .comment("Multiplier on how long fuel lasts in the kiln. Below 1.0 makes it hungrier than a furnace.")
         .translation("swindustry.configuration.kilnFuelEfficiency")
         .defineInRange("kiln.fuelEfficiency", 1.0, 0.1, 10.0);
+
+    // ---- Debug -------------------------------------------------------------
+
+    public static final ModConfigSpec.BooleanValue DEBUG_SPAWN_COMMANDS = BUILDER
+        .comment("Registers the /swindustry spawn_kiln debug commands and the F12 shortcut.",
+            "Clients read the synced server value, so the keybind goes quiet unless enabled here.")
+        .translation("swindustry.configuration.enableSpawnCommands")
+        .define("debug.enableSpawnCommands", false);
 
     public static final ModConfigSpec SPEC = BUILDER.build();
 

@@ -20,7 +20,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 
-/** Debug commands for SW: Industry. */
+/** Debug commands for SW: Industry; registered only when {@code debug.enableSpawnCommands} is on. */
 @EventBusSubscriber(modid = SWIndustry.MODID)
 public final class ModCommands {
 
@@ -28,6 +28,9 @@ public final class ModCommands {
 
     @SubscribeEvent
     public static void onRegisterCommands(RegisterCommandsEvent event) {
+        if (!com.jokerdayn.swindustry.Config.DEBUG_SPAWN_COMMANDS.get()) {
+            return;
+        }
         register(event.getDispatcher());
     }
 
@@ -41,18 +44,6 @@ public final class ModCommands {
                 .then(Commands.literal("spawn_cured_kiln")
                     .executes(ctx -> spawnKiln(ctx.getSource(), true))
                 )
-        );
-
-        dispatcher.register(
-            Commands.literal("spawn_kiln")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> spawnKiln(ctx.getSource(), false))
-        );
-
-        dispatcher.register(
-            Commands.literal("spawn_cured_kiln")
-                .requires(source -> source.hasPermission(2))
-                .executes(ctx -> spawnKiln(ctx.getSource(), true))
         );
     }
 

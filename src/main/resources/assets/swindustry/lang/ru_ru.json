@@ -73,12 +73,13 @@
   "message.swindustry.blueprint.calibrated": "Установлен чертёж: %s",
 
   "swindustry.configuration.title": "SW: Промышленность",
-  "swindustry.configuration.section.swindustry.common.toml": "SW: Промышленность",
-  "swindustry.configuration.section.swindustry.common.toml.title": "SW: Промышленность",
+  "swindustry.configuration.section.swindustry.server.toml": "SW: Промышленность",
+  "swindustry.configuration.section.swindustry.server.toml.title": "SW: Промышленность",
   "swindustry.configuration.strikeCooldown": "Задержка между ударами, тиков",
   "swindustry.configuration.requireDistinctStrikers": "Нужны именно кремень и камень",
   "swindustry.configuration.campfireBurnTicks": "Сколько горит костёр, тиков",
   "swindustry.configuration.rainExtinguishes": "Дождь тушит костёр",
   "swindustry.configuration.kilnCookTicks": "Базовое время плавки в печи, тиков",
-  "swindustry.configuration.kilnFuelEfficiency": "Множитель времени горения топлива"
+  "swindustry.configuration.kilnFuelEfficiency": "Множитель времени горения топлива",
+  "swindustry.configuration.enableSpawnCommands": "Зарегистрировать отладочные команды спавна"
 }
