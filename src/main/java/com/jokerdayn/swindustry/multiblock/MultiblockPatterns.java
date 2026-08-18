@@ -29,6 +29,20 @@ public final class MultiblockPatterns {
         return pattern;
     }
 
+    /**
+     * Swaps a rebuilt pattern in place. Datapack reloads compile fresh geometry; replacing by
+     * position keeps every identity-based lookup (controller {@code structurePattern()} equality)
+     * working against the newest instance instead of silently comparing against a stale one.
+     */
+    public static void replace(MultiblockPattern previous, MultiblockPattern replacement) {
+        int index = REGISTERED.indexOf(previous);
+        if (index >= 0) {
+            REGISTERED.set(index, replacement);
+        } else {
+            REGISTERED.add(replacement);
+        }
+    }
+
     public static List<MultiblockPattern> all() {
         return List.copyOf(REGISTERED);
     }

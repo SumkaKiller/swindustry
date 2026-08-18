@@ -21,7 +21,7 @@ public final class MultiblockBlueprints {
 
     public static final Definition CLAY_KILN = register(new Definition(
         SWIndustry.id("clay_kiln"),
-        () -> KilnPatterns.CLAY_KILN,
+        () -> KilnPatterns.clayKiln(),
         ModBlocks.CLAY_KILN_PORT,
         "blueprint.swindustry.clay_kiln"));
 

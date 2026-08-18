@@ -58,7 +58,7 @@ public final class ModCommands {
         Direction portFacing = facing.getOpposite();
         BlockPos controllerPos = player.blockPosition().relative(facing, 3);
 
-        MultiblockPattern pattern = KilnPatterns.CLAY_KILN;
+        MultiblockPattern pattern = KilnPatterns.clayKiln();
         BlockState wallState = cured
             ? ModBlocks.CLAY_BRICKS.get().defaultBlockState()
             : ModBlocks.RAW_CLAY_BRICKS.get().defaultBlockState();

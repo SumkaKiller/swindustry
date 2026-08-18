@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -31,6 +32,8 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.resources.Resource;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.tags.TagKey;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -112,6 +115,24 @@ public final class StructurePatternLoader {
                 throw new IllegalArgumentException("Could not find structure resource: " + fullPath);
             }
             return fromStream(is);
+        }
+
+        /**
+         * Loads the structure through pack resources, so world datapacks can override the
+         * machine's geometry the same way they override tags and recipes.
+         */
+        public Builder fromResource(ResourceManager resources, ResourceLocation location) {
+            String path = location.getPath().endsWith(".nbt") ? location.getPath() : location.getPath() + ".nbt";
+            ResourceLocation fullId = ResourceLocation.fromNamespaceAndPath(location.getNamespace(), path);
+            Optional<Resource> resource = resources.getResource(fullId);
+            if (resource.isEmpty()) {
+                throw new IllegalArgumentException("Could not find structure resource: " + fullId);
+            }
+            try (InputStream is = resource.get().open()) {
+                return fromStream(is);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to read multiblock structure " + fullId, e);
+            }
         }
 
         /** Loads the structure from an input stream (gzip compressed or uncompressed NBT). */

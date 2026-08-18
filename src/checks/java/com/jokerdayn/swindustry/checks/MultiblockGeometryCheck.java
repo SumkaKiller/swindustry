@@ -50,7 +50,7 @@ public final class MultiblockGeometryCheck {
         SharedConstants.tryDetectVersion();
         Bootstrap.bootStrap();
 
-        MultiblockPattern kiln = KilnPatterns.CLAY_KILN;
+        MultiblockPattern kiln = KilnPatterns.clayKiln();
 
         Map<BlockMatcher.Role, List<Vec3i>> byRole = new EnumMap<>(BlockMatcher.Role.class);
         for (BlockMatcher.Role role : BlockMatcher.Role.values()) {

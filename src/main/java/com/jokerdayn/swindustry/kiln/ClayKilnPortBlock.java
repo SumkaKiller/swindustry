@@ -160,7 +160,7 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
         // Smoke leaving the flue. The flue top sits at a fixed offset from the port, so the client
         // can place the plume itself without the server sending a single packet for it.
         if (random.nextInt(3) == 0) {
-            BlockPos flue = KilnPatterns.CLAY_KILN.toWorld(pos, facing, FLUE_TOP);
+            BlockPos flue = KilnPatterns.clayKiln().toWorld(pos, facing, FLUE_TOP);
             level.addAlwaysVisibleParticle(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, true,
                 flue.getX() + 0.5 + (random.nextDouble() - 0.5) * 0.3,
                 flue.getY() + 0.8,

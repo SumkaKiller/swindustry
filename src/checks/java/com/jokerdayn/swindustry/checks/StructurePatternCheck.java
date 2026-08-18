@@ -49,7 +49,7 @@ public final class StructurePatternCheck {
     }
 
     private static void testKilnNbtLoading() {
-        MultiblockPattern kiln = KilnPatterns.CLAY_KILN;
+        MultiblockPattern kiln = KilnPatterns.clayKiln();
 
         check("Kiln footprint is 5x5x5", kiln.size().equals(new Vec3i(5, 5, 5)), "got " + kiln.size());
         check("Kiln blockCount is 57", kiln.blockCount() == 57, "got " + kiln.blockCount());
@@ -73,7 +73,7 @@ public final class StructurePatternCheck {
     }
 
     private static void testNbtExportAndRoundTrip() throws Exception {
-        MultiblockPattern original = KilnPatterns.CLAY_KILN;
+        MultiblockPattern original = KilnPatterns.clayKiln();
 
         // Export pattern to NBT Tag
         CompoundTag exportedTag = StructurePatternLoader.exportToTag(original, matcher -> {

@@ -220,7 +220,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
 
     @Override
     protected MultiblockPattern pattern() {
-        return KilnPatterns.CLAY_KILN;
+        return KilnPatterns.clayKiln();
     }
 
     @Nullable
