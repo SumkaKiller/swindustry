@@ -74,6 +74,13 @@ public final class ModItems {
         () -> new MultiblockBlueprintItem(MultiblockBlueprints.CLAY_KILN.id(),
             new Item.Properties().stacksTo(1)));
 
+    static {
+        // Compile-checked pairing: the sheet item is bound to its definition, replacing an
+        // entire datapack recipe layer that shipped without a single instance.
+        MultiblockBlueprints.bindBlueprintItem(
+            MultiblockBlueprints.CLAY_KILN.id(), () -> CLAY_KILN_BLUEPRINT.get());
+    }
+
     // ---- Bronze tools -------------------------------------------------
 
     public static final DeferredHolder<Item, SwordItem> BRONZE_SWORD = ITEMS.register(

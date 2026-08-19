@@ -2,6 +2,7 @@ package com.jokerdayn.swindustry.blueprint;
 
 import com.jokerdayn.swindustry.item.PrimitiveEngineerGogglesItem;
 import java.util.List;
+import java.util.Optional;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -30,10 +31,17 @@ public final class MultiblockBlueprintItem extends Item {
         return blueprintId;
     }
 
+    /**
+     * Clips the plan into a pair of goggles: worn first, else whichever hand holds a pair. The
+     * sheet itself is never consumed, and the installed plan travels on the goggles' data
+     * component, so tooltips, inspection and the crafting-grid combine all read one truth.
+     */
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand usedHand) {
         ItemStack blueprint = player.getItemInHand(usedHand);
-        if (!PrimitiveEngineerGogglesItem.isHoldingOrWearingGoggles(player)) {
+
+        ItemStack target = PrimitiveEngineerGogglesItem.wornOrHeldGoggles(player);
+        if (target.isEmpty()) {
             if (!level.isClientSide) {
                 player.displayClientMessage(
                     Component.translatable("message.swindustry.blueprint.need_goggles"), true);
@@ -42,11 +50,16 @@ public final class MultiblockBlueprintItem extends Item {
         }
 
         if (!level.isClientSide) {
-            Component blueprintName = MultiblockBlueprints.byId(blueprintId)
-                .map(MultiblockBlueprints.Definition::name)
-                .orElse(Component.literal(blueprintId.toString()));
+            Optional<MultiblockBlueprints.Definition> definition = MultiblockBlueprints.byId(blueprintId);
+            if (definition.isEmpty()) {
+                player.displayClientMessage(
+                    Component.translatable("message.swindustry.goggles.unknown_blueprint"), true);
+                return InteractionResultHolder.fail(blueprint);
+            }
+            target.set(com.jokerdayn.swindustry.registry.ModDataComponents.SELECTED_BLUEPRINT.get(),
+                definition.get().id());
             player.displayClientMessage(Component.translatable(
-                "message.swindustry.blueprint.calibrated", blueprintName), true);
+                "item.swindustry.primitive_engineer_goggles.loaded", definition.get().name()), true);
             level.playSound(null, player.blockPosition(), SoundEvents.UI_CARTOGRAPHY_TABLE_TAKE_RESULT,
                 SoundSource.PLAYERS, 0.75F, 1.15F);
         }

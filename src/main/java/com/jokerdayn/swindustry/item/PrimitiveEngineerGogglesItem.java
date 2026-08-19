@@ -27,6 +27,23 @@ public final class PrimitiveEngineerGogglesItem extends ArmorItem {
         super(ModArmorMaterials.engineerGoggles(), Type.HELMET, properties);
     }
 
+    /** The first pair of goggles on the player: worn on head, then main hand, then off hand. */
+    public static ItemStack wornOrHeldGoggles(Player player) {
+        ItemStack head = player.getItemBySlot(EquipmentSlot.HEAD);
+        if (head.is(ModItems.PRIMITIVE_ENGINEER_GOGGLES.get())) {
+            return head;
+        }
+        ItemStack main = player.getMainHandItem();
+        if (main.is(ModItems.PRIMITIVE_ENGINEER_GOGGLES.get())) {
+            return main;
+        }
+        ItemStack off = player.getOffhandItem();
+        if (off.is(ModItems.PRIMITIVE_ENGINEER_GOGGLES.get())) {
+            return off;
+        }
+        return ItemStack.EMPTY;
+    }
+
     /** Checks if the player has engineer goggles equipped on head. */
     public static boolean isWearingGoggles(Player player) {
         return player.getItemBySlot(EquipmentSlot.HEAD).is(ModItems.PRIMITIVE_ENGINEER_GOGGLES.get());
@@ -73,6 +90,25 @@ public final class PrimitiveEngineerGogglesItem extends ArmorItem {
         }
 
         controller.revalidate();
+
+        // A calibrated visor is bound to one machine: refuse politely when used elsewhere.
+        // Without a plan the frame stays universal, exactly as before calibration existed.
+        net.minecraft.resources.ResourceLocation installed =
+            goggles.get(com.jokerdayn.swindustry.registry.ModDataComponents.SELECTED_BLUEPRINT.get());
+        if (installed != null) {
+            var definition = com.jokerdayn.swindustry.blueprint.MultiblockBlueprints.byId(installed);
+            if (definition.isEmpty()) {
+                player.displayClientMessage(
+                    Component.translatable("message.swindustry.goggles.unknown_blueprint"), true);
+                return InteractionResult.CONSUME;
+            }
+            if (!definition.get().matches(controller)) {
+                player.displayClientMessage(Component.translatable(
+                    "message.swindustry.goggles.wrong_controller", definition.get().name()), true);
+                return InteractionResult.CONSUME;
+            }
+        }
+
         List<MultiblockPattern.InspectionCell> inspection = controller.inspectStructure();
         if (inspection.isEmpty()) {
             player.displayClientMessage(
@@ -113,6 +149,20 @@ public final class PrimitiveEngineerGogglesItem extends ArmorItem {
         tooltipComponents.add(Component.translatable(
             "item.swindustry.primitive_engineer_goggles.early_frame")
             .withStyle(ChatFormatting.GRAY));
+        net.minecraft.resources.ResourceLocation installed =
+            stack.get(com.jokerdayn.swindustry.registry.ModDataComponents.SELECTED_BLUEPRINT.get());
+        if (installed != null) {
+            Component planName = com.jokerdayn.swindustry.blueprint.MultiblockBlueprints.byId(installed)
+                .map(com.jokerdayn.swindustry.blueprint.MultiblockBlueprints.Definition::name)
+                .orElse(Component.translatable("message.swindustry.goggles.unknown_blueprint"));
+            tooltipComponents.add(Component.translatable(
+                "item.swindustry.primitive_engineer_goggles.loaded", planName)
+                .withStyle(ChatFormatting.AQUA));
+        } else {
+            tooltipComponents.add(Component.translatable(
+                "item.swindustry.primitive_engineer_goggles.empty")
+                .withStyle(ChatFormatting.DARK_GRAY));
+        }
         tooltipComponents.add(Component.translatable(
             "item.swindustry.primitive_engineer_goggles.use_hint")
             .withStyle(ChatFormatting.AQUA));

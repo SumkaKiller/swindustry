@@ -1,7 +1,6 @@
 package com.jokerdayn.swindustry.registry;
 
 import com.jokerdayn.swindustry.SWIndustry;
-import com.jokerdayn.swindustry.blueprint.DraftingRecipe;
 import com.jokerdayn.swindustry.kiln.KilnRecipe;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -28,14 +27,8 @@ public final class ModRecipes {
     public static final DeferredHolder<RecipeType<?>, RecipeType<KilnRecipe>> KILN_TYPE =
         RECIPE_TYPES.register("kiln", () -> RecipeType.simple(SWIndustry.id("kiln")));
 
-    public static final DeferredHolder<RecipeType<?>, RecipeType<DraftingRecipe>> DRAFTING_TYPE =
-        RECIPE_TYPES.register("drafting", () -> RecipeType.simple(SWIndustry.id("drafting")));
-
     public static final DeferredHolder<RecipeSerializer<?>, KilnRecipe.Serializer> KILN_SERIALIZER =
         RECIPE_SERIALIZERS.register("kiln", KilnRecipe.Serializer::new);
-
-    public static final DeferredHolder<RecipeSerializer<?>, DraftingRecipe.Serializer> DRAFTING_SERIALIZER =
-        RECIPE_SERIALIZERS.register("drafting", DraftingRecipe.Serializer::new);
 
     private ModRecipes() {}
 

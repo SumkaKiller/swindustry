@@ -2,7 +2,6 @@ package com.jokerdayn.swindustry.blueprint;
 
 import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.jokerdayn.swindustry.registry.ModItems;
-import com.jokerdayn.swindustry.registry.ModRecipes;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.sounds.SoundEvents;
@@ -18,9 +17,6 @@ import net.minecraft.world.inventory.ResultContainer;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.item.crafting.RecipeHolder;
-import net.minecraft.world.item.crafting.RecipeManager;
-import net.minecraft.world.item.crafting.SingleRecipeInput;
 import net.minecraft.world.level.Level;
 
 /** Three inputs: paper, soot ink and a reusable controller sample; one blueprint output. */
@@ -36,8 +32,6 @@ public final class DraftingTableMenu extends AbstractContainerMenu {
 
     private final ContainerLevelAccess access;
     private final Level level;
-    private final RecipeManager.CachedCheck<SingleRecipeInput, DraftingRecipe> recipes =
-        RecipeManager.createCheck(ModRecipes.DRAFTING_TYPE.get());
     private long lastSoundTime;
 
     private final Container inputs = new SimpleContainer(3) {
@@ -130,27 +124,24 @@ public final class DraftingTableMenu extends AbstractContainerMenu {
             return;
         }
 
-        Optional<RecipeHolder<DraftingRecipe>> match =
-            recipes.getRecipeFor(new SingleRecipeInput(reference), level);
-        if (match.isEmpty()) {
+        Optional<MultiblockBlueprints.Definition> definition =
+            MultiblockBlueprints.byControllerSample(reference);
+        if (definition.isEmpty()) {
             clearResult();
             return;
         }
 
-        RecipeHolder<DraftingRecipe> holder = match.get();
-        ItemStack output = holder.value().assemble(
-            new SingleRecipeInput(reference), level.registryAccess());
-        if (!output.isItemEnabled(level.enabledFeatures())) {
+        // Paper and soot are spent on take; the sample itself is returned untouched.
+        ItemStack output = MultiblockBlueprints.blueprintStack(definition.get());
+        if (output.isEmpty() || !output.isItemEnabled(level.enabledFeatures())) {
             clearResult();
             return;
         }
-        result.setRecipeUsed(holder);
         setResult(output);
     }
 
     private boolean isDraftingReference(ItemStack stack) {
-        return !stack.isEmpty()
-            && recipes.getRecipeFor(new SingleRecipeInput(stack), level).isPresent();
+        return MultiblockBlueprints.byControllerSample(stack).isPresent();
     }
 
     private void clearResult() {

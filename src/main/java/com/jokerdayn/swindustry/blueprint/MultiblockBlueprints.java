@@ -19,6 +19,10 @@ public final class MultiblockBlueprints {
 
     private static final Map<ResourceLocation, Definition> DEFINITIONS = new LinkedHashMap<>();
 
+    /** Late-bound sheet items per definition; filled during item registration. */
+    private static final Map<ResourceLocation, java.util.function.Supplier<? extends net.minecraft.world.item.Item>>
+        BLUEPRINT_ITEMS = new java.util.HashMap<>();
+
     public static final Definition CLAY_KILN = register(new Definition(
         SWIndustry.id("clay_kiln"),
         () -> KilnPatterns.clayKiln(),
@@ -35,9 +39,46 @@ public final class MultiblockBlueprints {
         return definition;
     }
 
+    /**
+     * Late-binds a definition to its reusable sheet item. Called from {@code ModItems} during
+     * item registration; blueprints are intrinsically codebound to their patterns, so this
+     * compile-checked pairing replaces an entire datapack recipe layer.
+     */
+    public static void bindBlueprintItem(ResourceLocation id,
+                                         java.util.function.Supplier<? extends net.minecraft.world.item.Item> item) {
+        if (!DEFINITIONS.containsKey(id)) {
+            throw new IllegalStateException("Cannot bind blueprint item to unknown definition " + id);
+        }
+        BLUEPRINT_ITEMS.put(id, item);
+    }
+
     /** Finds a blueprint definition by its unique identifier. */
     public static Optional<Definition> byId(ResourceLocation id) {
         return Optional.ofNullable(DEFINITIONS.get(id));
+    }
+
+    /**
+     * The drafting-table flow: recognises a reusable machine sample by its controller block and
+     * returns the definition whose plan it drafts into.
+     */
+    public static Optional<Definition> byControllerSample(net.minecraft.world.item.ItemStack stack) {
+        if (stack.isEmpty()) {
+            return Optional.empty();
+        }
+        for (Definition definition : DEFINITIONS.values()) {
+            if (stack.is(definition.controller().get().asItem())) {
+                return Optional.of(definition);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /** The reusable sheet belonging to a definition, or empty before item registration binds it. */
+    public static net.minecraft.world.item.ItemStack blueprintStack(Definition definition) {
+        java.util.function.Supplier<? extends net.minecraft.world.item.Item> supplier =
+            BLUEPRINT_ITEMS.get(definition.id());
+        return supplier == null ? net.minecraft.world.item.ItemStack.EMPTY
+            : new net.minecraft.world.item.ItemStack(supplier.get());
     }
 
     /**
