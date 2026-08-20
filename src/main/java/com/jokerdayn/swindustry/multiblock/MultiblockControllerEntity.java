@@ -132,6 +132,15 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
         validationDeferred = false;
         formed = next;
 
+        // Ownership registry: written only from verified instances so break events stay a single
+        // map hit, and released the moment the machine stops matching or is removed.
+        if (previous != null && previous != next) {
+            MultiblockPatterns.release(this, previous);
+        }
+        if (next != null) {
+            MultiblockPatterns.claim(this, next);
+        }
+
         boolean firstValidation = !firstValidationDone;
         firstValidationDone = true;
 
@@ -184,6 +193,7 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
         // Deliberately does not fire onUnformed. That callback exists for a machine that came apart
         // while it still exists — a subclass will want to stop its fire and clear its state, which
         // usually means touching its own block. There is no block left to touch here.
+        MultiblockPatterns.release(this, formed);
         formed = null;
         validationDeferred = false;
         super.setRemoved();
