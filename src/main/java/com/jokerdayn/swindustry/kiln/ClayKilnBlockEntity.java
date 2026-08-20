@@ -107,6 +107,16 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private boolean rainingCache;
     private long rainingSampledAt = Long.MIN_VALUE;
 
+    /**
+     * Cached heat ceiling; {@code -1} means "recompute from the shell census". The ceiling only
+     * moves when a brick cures or the machine forms/breaks, so it is recomputed exactly there
+     * instead of rescanning all 56 walls every lit tick.
+     */
+    private int ceilingCache = -1;
+
+    /** Set when something may have touched the interior; triggers one bounded flood scan. */
+    private boolean floodCheckQueued;
+
     private final ItemStackHandler items = new ItemStackHandler(SLOT_COUNT) {
         @Override
         protected void onContentsChanged(int slot) {
@@ -242,11 +252,31 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     }
 
     public int effectiveMaxHeat() {
+        if (ceilingCache < 0) {
+            computeCeiling();
+        }
+        return ceilingCache;
+    }
+
+    private void computeCeiling() {
         if (isCured()) {
-            return MAX_HEAT;
+            ceilingCache = MAX_HEAT;
+            return;
         }
         float ratio = curedRatio();
-        return Math.min(MAX_HEAT, 350 + Math.round(650.0F * ratio));
+        ceilingCache = Math.min(MAX_HEAT, 350 + Math.round(650.0F * ratio));
+    }
+
+    private void invalidateCeiling() {
+        ceilingCache = -1;
+    }
+
+    @Override
+    public void invalidateStructure() {
+        super.invalidateStructure();
+        // Something may have entered or obstructed the interior; queue one bounded scan instead
+        // of polling the cavity every tick.
+        floodCheckQueued = true;
     }
 
     public float curedRatio() {
@@ -293,6 +323,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 this.cured = true;
             }
         }
+        invalidateCeiling();
     }
 
     @Override
@@ -319,6 +350,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         curingSchedule.clear();
         scheduleIndex = 0;
         status = KilnStatus.INCOMPLETE;
+        invalidateCeiling();
     }
 
     private void clearLitVisual() {
@@ -364,7 +396,11 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         MultiblockInstance instance = operational ? kiln.instance() : null;
 
         // Water check: water flowing into the cavity instantly puts out fire and quenches heat
-        if (operational && instance != null) {
+        // Water check: pushed by neighbour changes and re-verified on a slow cadence, instead of
+        // scanning all twenty cavity cells every single tick.
+        if (operational && instance != null
+            && (kiln.floodCheckQueued || level.getGameTime() % 40 == 0)) {
+            kiln.floodCheckQueued = false;
             boolean flooded = false;
             for (BlockPos cavityPos : instance.cavity()) {
                 if (level.getFluidState(cavityPos).is(FluidTags.WATER)) {
@@ -591,6 +627,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 level.setBlock(targetPos, ModBlocks.CLAY_BRICKS.get().defaultBlockState(), Block.UPDATE_ALL);
                 spawnCuringEffects(level, targetPos);
                 changed = true;
+                invalidateCeiling();
             }
             scheduleIndex++;
         }

@@ -28,4 +28,12 @@ public class MultiblockPartBlock extends Block {
         }
         super.onRemove(state, level, pos, newState, movedByPiston);
     }
+
+    @Override
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock,
+                                   BlockPos fromPos, boolean isMoving) {
+        // A change beside one of our walls may have flooded or obstructed the interior; push the
+        // news instead of letting machines poll their cavities every tick.
+        MultiblockPatterns.notifyNeighborChanged(level, fromPos);
+    }
 }

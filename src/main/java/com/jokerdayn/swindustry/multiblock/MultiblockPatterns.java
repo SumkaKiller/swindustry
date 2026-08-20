@@ -22,8 +22,12 @@ public final class MultiblockPatterns {
 
     private static final List<MultiblockPattern> REGISTERED = new ArrayList<>();
 
-    /** Packed wall position -> controller currently verified to own it. Server thread only. */
+    /** Packed wall position -> controller currently verified to own that block. Server thread only. */
     private static final Long2ObjectOpenHashMap<MultiblockControllerEntity> OWNERSHIP =
+        new Long2ObjectOpenHashMap<>();
+
+    /** Packed cavity position -> controller that needs it kept clear, for neighbour pushes. */
+    private static final Long2ObjectOpenHashMap<MultiblockControllerEntity> CAVITY_OWNERS =
         new Long2ObjectOpenHashMap<>();
 
     private MultiblockPatterns() {}
@@ -60,6 +64,9 @@ public final class MultiblockPatterns {
         for (BlockPos wall : instance.walls()) {
             OWNERSHIP.put(wall.asLong(), controller);
         }
+        for (BlockPos cell : instance.cavity()) {
+            CAVITY_OWNERS.put(cell.asLong(), controller);
+        }
     }
 
     /** Drops this controller's entries without touching a newer claimant's, if any. */
@@ -71,6 +78,23 @@ public final class MultiblockPatterns {
         OWNERSHIP.remove(instance.controllerPos().asLong(), controller);
         for (BlockPos wall : instance.walls()) {
             OWNERSHIP.remove(wall.asLong(), controller);
+        }
+        for (BlockPos cell : instance.cavity()) {
+            CAVITY_OWNERS.remove(cell.asLong(), controller);
+        }
+    }
+
+    /**
+     * Push hook from part blocks' {@code neighborChanged}: something changed at {@code changedPos},
+     * which may be one of our interior cells — most importantly, fluid may have entered.
+     */
+    public static void notifyNeighborChanged(Level level, BlockPos changedPos) {
+        if (level.isClientSide) {
+            return;
+        }
+        MultiblockControllerEntity owner = CAVITY_OWNERS.get(changedPos.asLong());
+        if (owner != null && !owner.isRemoved() && owner.getLevel() == level) {
+            owner.invalidateStructure();
         }
     }
 
