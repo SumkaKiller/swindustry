@@ -7,8 +7,8 @@ import com.jokerdayn.swindustry.multiblock.MultiblockPattern;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
 import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.jokerdayn.swindustry.registry.ModRecipes;
-import java.util.ArrayList;
-import java.util.Comparator;
+import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
@@ -92,16 +92,23 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private static final String KEY_EXPERIENCE = "StoredExperience";
     private static final String KEY_ACTIVE_JOB = "ActiveJob";
     private static final String KEY_HEAT = "Heat";
-    private static final String KEY_CURING_PROGRESS = "CuringProgress";
-    private static final String KEY_CURED = "Cured";
+    private static final String KEY_SOAK = "Soak";
+    private static final String KEY_SOAK_STARTS = "SoakStarts";
     private static final String KEY_HANDLER_SIZE = "Size";
     private static final int SAVE_INTERVAL = 20;
 
-    /** One brick scheduled to cure at a specific cumulative burning tick. */
-    private record ScheduledBrick(BlockPos pos, int cureTick) {}
+    /**
+     * Thermal soak: ticks of fire accumulated while formed and lit. Each raw brick records the
+     * soak value it started from ({@link #soakStarts}); it cures when {@code soak - start}
+     * reaches its position's zone requirement.
+     */
+    private float soak;
 
-    private final List<ScheduledBrick> curingSchedule = new ArrayList<>();
-    private int scheduleIndex;
+    /** Repair bricks only: packed position -> soak when inserted. The initial batch needs none. */
+    private final Long2IntOpenHashMap soakStarts = new Long2IntOpenHashMap();
+
+    /** Packed positions of wall cells currently raw; memory-side, rebuilt on every form. */
+    private final LongOpenHashSet rawWalls = new LongOpenHashSet();
 
     /** Weather sampled at most twice a second: {@code isRainingAt} walks the heightmap. */
     private boolean rainingCache;
@@ -146,8 +153,6 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private int cookProgress;
     private int cookDuration = KilnRecipe.DEFAULT_COOKING_TIME;
     private int heat;
-    private int curingProgress;
-    private boolean cured;
     private float storedExperience;
     private KilnStatus status = KilnStatus.INCOMPLETE;
     @Nullable
@@ -247,8 +252,12 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         return isCured() ? KilnRecipe.TIER_CLAY : 0;
     }
 
+    /**
+     * Fully derived: a formed machine with no raw clay left in its walls counts as cured. Never
+     * persisted, so a shell edited while the server was down cannot be believed in.
+     */
     public boolean isCured() {
-        return cured;
+        return instance() != null && rawWalls.isEmpty();
     }
 
     public int effectiveMaxHeat() {
@@ -282,7 +291,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     public float curedRatio() {
         MultiblockInstance instance = instance();
         if (instance == null || level == null) {
-            return cured ? 1.0F : 0.0F;
+            return isCured() ? 1.0F : 0.0F;
         }
         int rawCount = 0;
         int curedCount = 0;
@@ -298,29 +307,32 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             }
         }
         int total = rawCount + curedCount;
-        return total > 0 ? (float) curedCount / total : (cured ? 1.0F : 0.0F);
+        return total > 0 ? (float) curedCount / total : (isCured() ? 1.0F : 0.0F);
     }
 
     @Override
     protected void onFormed(com.jokerdayn.swindustry.multiblock.MultiblockInstance instance) {
         status = KilnStatus.IDLE;
-        curingSchedule.clear();
-        scheduleIndex = 0;
-        if (level != null) {
-            boolean hasRaw = false;
+
+        // Rebuild raw-wall tracking from the actual world. Repair bricks inserted into an
+        // already-soaking shell start from today's soak value; the original batch starts at
+        // zero by construction and needs no stored entry.
+        rawWalls.clear();
+        soakStarts.clear();
+        if (level != null && !level.isClientSide) {
             for (BlockPos pos : instance.walls()) {
-                if (!pos.equals(worldPosition) && level.getBlockState(pos).is(ModBlocks.RAW_CLAY_BRICKS.get())) {
-                    hasRaw = true;
-                    break;
+                if (pos.equals(worldPosition)) {
+                    continue;
                 }
-            }
-            if (hasRaw) {
-                if (this.cured) {
-                    this.curingProgress = 0;
+                BlockState state = level.getBlockState(pos);
+                if (!state.is(ModBlocks.RAW_CLAY_BRICKS.get())) {
+                    continue;
                 }
-                this.cured = false;
-            } else {
-                this.cured = true;
+                long packed = pos.asLong();
+                rawWalls.add(packed);
+                if (soak > 0) {
+                    soakStarts.put(packed, Math.min(Integer.MAX_VALUE, (int) soak));
+                }
             }
         }
         invalidateCeiling();
@@ -347,8 +359,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         cookProgress = 0;
         heat = 0;
         activeJobKey = null;
-        curingSchedule.clear();
-        scheduleIndex = 0;
+        rawWalls.clear();
+        soakStarts.clear();
         status = KilnStatus.INCOMPLETE;
         invalidateCeiling();
     }
@@ -427,10 +439,6 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 // Smooth cooling over ~50 seconds when structure is broken
                 kiln.heat = Math.max(0, kiln.heat - 1);
                 dirty = true;
-            } else if (kiln.curingProgress > 0 && level.getGameTime() % 10 == 0) {
-                // Very slow thermal loss when completely cold
-                kiln.curingProgress--;
-                dirty = true;
             }
         } else {
             if (kiln.litTime > 0) {
@@ -445,15 +453,11 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                     kiln.heat = Math.max(effectiveMax, kiln.heat - 1);
                     dirty = true;
                 }
-                dirty = kiln.tickCuring(level) || dirty;
+                dirty = kiln.tickSoak(level) || dirty;
             } else {
                 if (kiln.heat > 0) {
                     // Smooth gradual cooling
                     kiln.heat = Math.max(0, kiln.heat - 1);
-                    dirty = true;
-                } else if (kiln.curingProgress > 0 && level.getGameTime() % 10 == 0) {
-                    // Slow thermal progress decay when cold
-                    kiln.curingProgress--;
                     dirty = true;
                 }
             }
@@ -578,107 +582,58 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     }
 
     /**
-     * Thermodynamic curing progression:
-     * Fires raw clay bricks into cured ceramic clay bricks smoothly across their thermal exposure
-     * zones (~155-210 seconds / 3100-4200 ticks) from the combustion chamber out to the vault,
-     * chimney, and massive floor.
+     * Thermal soak, one tick of fire at a time.
      *
-     * <p>Optimized with an event schedule so steady-state execution costs a single integer comparison
-     * per tick (O(1) with zero block queries when idle).</p>
+     * <p>Bricks cure across their thermal exposure zones (~155-210 s) measured from when they
+     * entered a hot shell, not from a shared counter — so replacing one damaged brick re-soaks
+     * only that brick, and nothing ever resets anybody else's progress. Rain thins the flame to
+     * roughly three quarters, the same trade the old ×1.30 threshold made.</p>
+     *
+     * <p>Steady-state cost is O(pending bricks) over pure memory; no block reads happen unless
+     * something is actually due to convert.</p>
      */
-    private boolean tickCuring(Level level) {
-        if (level.isClientSide || !isLit() || !isFormed() || cured) {
+    private boolean tickSoak(Level level) {
+        if (!isLit() || !isFormed() || rawWalls.isEmpty()) {
             return false;
         }
 
-        if (curingSchedule.isEmpty()) {
-            buildCuringSchedule(level);
-            if (curingSchedule.isEmpty()) {
-                this.cured = true;
-                return false;
-            }
+        boolean raining = sampledRaining(level);
+        soak += raining ? 0.77F : 1.0F;
+        if (raining && level.random.nextInt(40) == 0 && level instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(ParticleTypes.SMOKE,
+                worldPosition.getX() + 0.5, worldPosition.getY() + 1.2, worldPosition.getZ() + 0.5,
+                1, 0.3, 0.1, 0.3, 0.01);
         }
-
-        curingProgress++;
 
         boolean changed = false;
-        boolean raining = sampledRaining(level);
-        while (scheduleIndex < curingSchedule.size()) {
-            ScheduledBrick next = curingSchedule.get(scheduleIndex);
-            BlockPos targetPos = next.pos();
-
-            // Rain modifier: exposed bricks cure ~30% slower while any rain falls on the kiln.
-            int requiredTicks = next.cureTick();
-            if (raining) {
-                requiredTicks = (int) (requiredTicks * 1.30F);
-                if (level.random.nextInt(40) == 0 && level instanceof ServerLevel serverLevel) {
-                    serverLevel.sendParticles(ParticleTypes.SMOKE,
-                        targetPos.getX() + 0.5, targetPos.getY() + 1.0, targetPos.getZ() + 0.5,
-                        1, 0.1, 0.1, 0.1, 0.01);
-                }
-            }
-
-            if (curingProgress < requiredTicks) {
-                break;
-            }
-
-            BlockState state = level.getBlockState(targetPos);
-            if (state.is(ModBlocks.RAW_CLAY_BRICKS.get())) {
-                level.setBlock(targetPos, ModBlocks.CLAY_BRICKS.get().defaultBlockState(), Block.UPDATE_ALL);
-                spawnCuringEffects(level, targetPos);
-                changed = true;
-                invalidateCeiling();
-            }
-            scheduleIndex++;
-        }
-
-        if (scheduleIndex >= curingSchedule.size()) {
-            this.cured = true;
-            this.curingSchedule.clear();
-            playKilnCompletionSound(level);
-            return true;
-        }
-
-        return changed;
-    }
-
-    /**
-     * Builds the sorted curing schedule for all remaining raw clay bricks in the multiblock.
-     */
-    private void buildCuringSchedule(Level level) {
-        MultiblockInstance instance = instance();
-        if (instance == null) {
-            return;
-        }
-
-        curingSchedule.clear();
-        scheduleIndex = 0;
         int floorY = worldPosition.getY() - 1;
-
-        for (BlockPos pos : instance.walls()) {
-            if (pos.equals(worldPosition)) {
+        it.unimi.dsi.fastutil.longs.LongIterator iterator = rawWalls.iterator();
+        while (iterator.hasNext()) {
+            long packed = iterator.nextLong();
+            BlockPos pos = BlockPos.of(packed);
+            int start = soakStarts.get(packed); // fastutil default: 0
+            if (soak - start < calculateBrickRequiredTicks(pos, floorY)) {
                 continue;
             }
-            if (level.getBlockState(pos).is(ModBlocks.RAW_CLAY_BRICKS.get())) {
-                int requiredTicks = calculateBrickRequiredTicks(pos, floorY);
-                curingSchedule.add(new ScheduledBrick(pos, requiredTicks));
+
+            // Stale-entry safety: the cell may have been mined or swapped since formation.
+            if (!level.getBlockState(pos).is(ModBlocks.RAW_CLAY_BRICKS.get())) {
+                iterator.remove();
+                soakStarts.remove(packed);
+                continue;
             }
+
+            level.setBlock(pos, ModBlocks.CLAY_BRICKS.get().defaultBlockState(), Block.UPDATE_ALL);
+            spawnCuringEffects(level, pos);
+            changed = true;
+            invalidateCeiling();
+            iterator.remove();
         }
 
-        curingSchedule.sort(Comparator.comparingInt(ScheduledBrick::cureTick));
-
-        if (curingSchedule.isEmpty()) {
-            this.cured = true;
-            return;
+        if (rawWalls.isEmpty()) {
+            playKilnCompletionSound(level);
         }
-
-        this.cured = false;
-        // If curingProgress is already higher than or equal to the earliest raw brick in the schedule,
-        // it means raw bricks were placed into a previously advanced or cured kiln.
-        // Reset curingProgress so newly inserted raw bricks undergo their full thermal firing duration.
-        if (curingProgress >= curingSchedule.get(0).cureTick()) {
-            curingProgress = 0;
-        }
+        return changed;
     }
 
     /**
@@ -975,8 +930,21 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             ? Math.max(1, tag.getInt(KEY_COOK_DURATION))
             : KilnRecipe.DEFAULT_COOKING_TIME;
         cookProgress = Mth.clamp(tag.getInt(KEY_COOK_PROGRESS), 0, cookDuration - 1);
-        curingProgress = Math.max(0, tag.getInt(KEY_CURING_PROGRESS));
-        cured = tag.getBoolean(KEY_CURED);
+        // Legacy saves map their counter straight into the new soak clock; the old cured flag is
+        // dropped — "cured" is always re-derived from the walls on first formation nowadays.
+        if (tag.contains(KEY_SOAK, Tag.TAG_FLOAT)) {
+            soak = Math.max(0, tag.getFloat(KEY_SOAK));
+        } else {
+            soak = Math.max(0, tag.getInt("CuringProgress"));
+        }
+        soakStarts.clear();
+        net.minecraft.nbt.ListTag soakStartList = tag.getList(KEY_SOAK_STARTS, Tag.TAG_COMPOUND);
+        for (int i = 0; i < soakStartList.size(); i++) {
+            CompoundTag entry = soakStartList.getCompound(i);
+            if (entry.contains("Pos", Tag.TAG_LONG) && entry.contains("Start", Tag.TAG_INT)) {
+                soakStarts.put(entry.getLong("Pos"), Math.max(0, entry.getInt("Start")));
+            }
+        }
         float loadedExperience = tag.getFloat(KEY_EXPERIENCE);
         storedExperience = Float.isFinite(loadedExperience) && loadedExperience >= 0.0F
             ? loadedExperience
@@ -995,8 +963,15 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         tag.putInt(KEY_LIT_DURATION, litDuration);
         tag.putInt(KEY_COOK_PROGRESS, cookProgress);
         tag.putInt(KEY_COOK_DURATION, cookDuration);
-        tag.putInt(KEY_CURING_PROGRESS, curingProgress);
-        tag.putBoolean(KEY_CURED, cured);
+        tag.putFloat(KEY_SOAK, soak);
+        net.minecraft.nbt.ListTag soakStartList = new net.minecraft.nbt.ListTag();
+        for (long packed : soakStarts.keySet().toLongArray()) {
+            CompoundTag entry = new CompoundTag();
+            entry.putLong("Pos", packed);
+            entry.putInt("Start", soakStarts.get(packed));
+            soakStartList.add(entry);
+        }
+        tag.put(KEY_SOAK_STARTS, soakStartList);
         tag.putFloat(KEY_EXPERIENCE, storedExperience);
         tag.putInt(KEY_HEAT, heat);
         if (cookProgress > 0 && activeJobKey != null) {
