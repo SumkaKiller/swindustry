@@ -7,6 +7,7 @@ import com.jokerdayn.swindustry.multiblock.MultiblockPattern;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
 import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.jokerdayn.swindustry.registry.ModRecipes;
+import com.jokerdayn.swindustry.registry.ModTags;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
 import java.util.List;
@@ -23,6 +24,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.tags.FluidTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Containers;
 import net.minecraft.world.MenuProvider;
@@ -120,6 +122,9 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
      * instead of rescanning all 56 walls every lit tick.
      */
     private int ceilingCache = -1;
+
+    /** Derived tier of the shell material; recomputed with the same census pass. */
+    private int tierCache = -1;
 
     /** Set when something may have touched the interior; triggers one bounded flood scan. */
     private boolean floodCheckQueued;
@@ -245,11 +250,14 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     }
 
     /**
-     * How good this kiln is. Raw clay is tier 0; once the shell bricks have cured into ceramic,
-     * it unlocks tier 1 (bronze recipes).
+     * How good this kiln is. Derived from the shell census: tier 0 while any wall is raw clay,
+     * then the highest {@code kiln_wall_tier_N} tag every wall satisfies.
      */
     public int tier() {
-        return isCured() ? KilnRecipe.TIER_CLAY : 0;
+        if (tierCache < 0) {
+            refreshShellCensus();
+        }
+        return tierCache;
     }
 
     /**
@@ -262,22 +270,54 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
 
     public int effectiveMaxHeat() {
         if (ceilingCache < 0) {
-            computeCeiling();
+            refreshShellCensus();
         }
         return ceilingCache;
     }
 
-    private void computeCeiling() {
+    /**
+     * One pass over the shell answers both questions the machine asks of it: how hot it may get
+     * (cure ratio) and what tier of shell material it is built from (highest tag every wall
+     * satisfies, resolved only while fully cured).
+     */
+    private void refreshShellCensus() {
+        MultiblockInstance instance = instance();
+
         if (isCured()) {
             ceilingCache = MAX_HEAT;
-            return;
+        } else {
+            float ratio = curedRatio();
+            ceilingCache = Math.min(MAX_HEAT, 350 + Math.round(650.0F * ratio));
         }
-        float ratio = curedRatio();
-        ceilingCache = Math.min(MAX_HEAT, 350 + Math.round(650.0F * ratio));
+
+        int resolved = 0;
+        if (instance != null && level != null && !level.isClientSide && isCured()) {
+            for (int candidate = ModTags.Blocks.KILN_WALL_TIERS.size(); candidate >= 1; candidate--) {
+                if (shellMatchesTier(instance, ModTags.Blocks.KILN_WALL_TIERS.get(candidate - 1))) {
+                    resolved = candidate;
+                    break;
+                }
+            }
+        }
+        tierCache = resolved;
+    }
+
+    private boolean shellMatchesTier(com.jokerdayn.swindustry.multiblock.MultiblockInstance instance,
+                                     TagKey<Block> tierTag) {
+        for (BlockPos wall : instance.walls()) {
+            if (wall.equals(worldPosition)) {
+                continue;
+            }
+            if (!level.getBlockState(wall).is(tierTag)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void invalidateCeiling() {
         ceilingCache = -1;
+        tierCache = -1;
     }
 
     @Override

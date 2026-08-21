@@ -30,6 +30,16 @@ public final class ModTags {
         /** Anything the clay kiln's shell may be built from. */
         public static final TagKey<Block> KILN_WALL = block(SWIndustry.id("kiln_wall"));
 
+        /** Shell materials that can hold a tier-1 kiln's heat once fired. */
+        public static final TagKey<Block> KILN_WALL_TIER_1 = block(SWIndustry.id("kiln_wall_tier_1"));
+
+        /**
+         * Highest-to-lowest shell tiers this build resolves. A future alloy wall is one new tag
+         * plus one more entry here — no code per tier anywhere else.
+         */
+        public static final java.util.List<TagKey<Block>> KILN_WALL_TIERS =
+            java.util.List.of(KILN_WALL_TIER_1);
+
         private static TagKey<Block> block(ResourceLocation id) {
             return TagKey.create(Registries.BLOCK, id);
         }
