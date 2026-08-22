@@ -1,5 +1,7 @@
 {
   "itemGroup.swindustry": "SW: Industry",
+  "key.categories.swindustry": "SW: Industry",
+  "key.swindustry.spawn_kiln": "Spawn Clay Kiln (Debug)",
 
   "block.swindustry.primitive_campfire": "Primitive Campfire",
   "block.swindustry.raw_clay_bricks": "Raw Clay Bricks",

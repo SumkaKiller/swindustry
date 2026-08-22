@@ -22,6 +22,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.tags.FluidTags;
 import net.minecraft.util.Mth;
 import net.minecraft.world.Containers;
 import net.minecraft.world.MenuProvider;
@@ -340,10 +341,39 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         boolean dirty = false;
 
         boolean operational = kiln.revalidateIfStale();
+        MultiblockInstance instance = operational ? kiln.instance() : null;
+
+        // Water check: water flowing into the cavity instantly puts out fire and quenches heat
+        if (operational && instance != null) {
+            boolean flooded = false;
+            for (BlockPos cavityPos : instance.cavity()) {
+                if (level.getFluidState(cavityPos).is(FluidTags.WATER)) {
+                    flooded = true;
+                    break;
+                }
+            }
+            if (flooded && (kiln.isLit() || kiln.heat > 0)) {
+                if (level instanceof ServerLevel serverLevel) {
+                    serverLevel.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
+                        pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
+                        10, 0.4, 0.4, 0.4, 0.05);
+                    serverLevel.playSound(null, pos, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.8F, 0.9F);
+                }
+                kiln.litTime = 0;
+                kiln.heat = Math.max(0, kiln.heat - 50);
+                dirty = true;
+            }
+        }
+
         if (!operational) {
             kiln.status = KilnStatus.INCOMPLETE;
             if (kiln.heat > 0) {
-                kiln.heat = Math.max(0, kiln.heat - 2);
+                // Smooth cooling over ~50 seconds when structure is broken
+                kiln.heat = Math.max(0, kiln.heat - 1);
+                dirty = true;
+            } else if (kiln.curingProgress > 0 && level.getGameTime() % 10 == 0) {
+                // Very slow thermal loss when completely cold
+                kiln.curingProgress--;
                 dirty = true;
             }
         } else {
@@ -362,7 +392,12 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 dirty = kiln.tickCuring(level) || dirty;
             } else {
                 if (kiln.heat > 0) {
+                    // Smooth gradual cooling
                     kiln.heat = Math.max(0, kiln.heat - 1);
+                    dirty = true;
+                } else if (kiln.curingProgress > 0 && level.getGameTime() % 10 == 0) {
+                    // Slow thermal progress decay when cold
+                    kiln.curingProgress--;
                     dirty = true;
                 }
             }
@@ -500,11 +535,23 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         boolean changed = false;
         while (scheduleIndex < curingSchedule.size()) {
             ScheduledBrick next = curingSchedule.get(scheduleIndex);
-            if (curingProgress < next.cureTick()) {
+            BlockPos targetPos = next.pos();
+
+            // Rain modifier: rain falling on exposed exterior bricks cools them, requiring +30% curing time
+            int requiredTicks = next.cureTick();
+            if (level.isRainingAt(targetPos)) {
+                requiredTicks = (int) (requiredTicks * 1.30F);
+                if (level.random.nextInt(40) == 0 && level instanceof ServerLevel serverLevel) {
+                    serverLevel.sendParticles(ParticleTypes.SMOKE,
+                        targetPos.getX() + 0.5, targetPos.getY() + 1.0, targetPos.getZ() + 0.5,
+                        1, 0.1, 0.1, 0.1, 0.01);
+                }
+            }
+
+            if (curingProgress < requiredTicks) {
                 break;
             }
 
-            BlockPos targetPos = next.pos();
             BlockState state = level.getBlockState(targetPos);
             if (state.is(ModBlocks.RAW_CLAY_BRICKS.get())) {
                 level.setBlock(targetPos, ModBlocks.CLAY_BRICKS.get().defaultBlockState(), Block.UPDATE_ALL);

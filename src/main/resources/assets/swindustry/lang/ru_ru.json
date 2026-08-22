@@ -1,5 +1,7 @@
 {
   "itemGroup.swindustry": "SW: Промышленность",
+  "key.categories.swindustry": "SW: Промышленность",
+  "key.swindustry.spawn_kiln": "Заспавнить глиняную печь (Дебаг)",
 
   "block.swindustry.primitive_campfire": "Примитивный костёр",
   "block.swindustry.raw_clay_bricks": "Сырые глиняные кирпичи",
