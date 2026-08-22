@@ -1,7 +1,6 @@
 package com.jokerdayn.swindustry.registry;
 
 import com.jokerdayn.swindustry.SWIndustry;
-import com.jokerdayn.swindustry.blueprint.DraftingTableBlock;
 import com.jokerdayn.swindustry.campfire.PrimitiveCampfireBlock;
 import com.jokerdayn.swindustry.kiln.ClayKilnPortBlock;
 import com.jokerdayn.swindustry.multiblock.MultiblockPartBlock;
@@ -69,16 +68,6 @@ public final class ModBlocks {
             .strength(1.5f, 3.0f)
             .sound(SoundType.MUD_BRICKS)
             .lightLevel(ClayKilnPortBlock::lightEmission))
-    );
-
-    /** A low wooden desk whose paper surface turns controller samples into reusable plans. */
-    public static final DeferredBlock<DraftingTableBlock> DRAFTING_TABLE = BLOCKS.register(
-        "drafting_table",
-        () -> new DraftingTableBlock(BlockBehaviour.Properties.of()
-            .mapColor(MapColor.WOOD)
-            .strength(2.0F, 3.0F)
-            .sound(SoundType.WOOD)
-            .noOcclusion())
     );
 
     private ModBlocks() {}

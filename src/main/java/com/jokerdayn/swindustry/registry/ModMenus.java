@@ -1,7 +1,6 @@
 package com.jokerdayn.swindustry.registry;
 
 import com.jokerdayn.swindustry.SWIndustry;
-import com.jokerdayn.swindustry.blueprint.DraftingTableMenu;
 import com.jokerdayn.swindustry.kiln.ClayKilnMenu;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.inventory.MenuType;
@@ -23,9 +22,6 @@ public final class ModMenus {
      */
     public static final DeferredHolder<MenuType<?>, MenuType<ClayKilnMenu>> CLAY_KILN =
         MENUS.register("clay_kiln", () -> IMenuTypeExtension.create(ClayKilnMenu::new));
-
-    public static final DeferredHolder<MenuType<?>, MenuType<DraftingTableMenu>> DRAFTING_TABLE =
-        MENUS.register("drafting_table", () -> new MenuType<>(DraftingTableMenu::new, FeatureFlags.VANILLA_SET));
 
     private ModMenus() {}
 

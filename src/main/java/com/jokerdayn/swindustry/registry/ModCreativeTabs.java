@@ -27,8 +27,6 @@ public final class ModCreativeTabs {
                 output.accept(ModItems.RAW_CLAY_BRICKS.get());
                 output.accept(ModItems.CLAY_BRICKS.get());
                 output.accept(ModItems.CLAY_KILN_PORT.get());
-                output.accept(ModItems.DRAFTING_TABLE.get());
-                output.accept(ModItems.CLAY_KILN_BLUEPRINT.get());
                 output.accept(ModItems.BRONZE_SWORD.get());
                 output.accept(ModItems.BRONZE_PICKAXE.get());
                 output.accept(ModItems.BRONZE_AXE.get());

@@ -1,8 +1,6 @@
 package com.jokerdayn.swindustry.registry;
 
 import com.jokerdayn.swindustry.SWIndustry;
-import com.jokerdayn.swindustry.blueprint.MultiblockBlueprintItem;
-import com.jokerdayn.swindustry.blueprint.MultiblockBlueprints;
 import com.jokerdayn.swindustry.item.PrimitiveEngineerGogglesItem;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.AxeItem;
@@ -46,10 +44,6 @@ public final class ModItems {
         "clay_kiln_port",
         () -> new BlockItem(ModBlocks.CLAY_KILN_PORT.get(), new Item.Properties()));
 
-    public static final DeferredHolder<Item, BlockItem> DRAFTING_TABLE = ITEMS.register(
-        "drafting_table",
-        () -> new BlockItem(ModBlocks.DRAFTING_TABLE.get(), new Item.Properties()));
-
     // ---- Leavings -----------------------------------------------------
 
     /**
@@ -68,18 +62,6 @@ public final class ModItems {
         ITEMS.register("primitive_engineer_goggles", () -> new PrimitiveEngineerGogglesItem(
             new Item.Properties().durability(
                 ArmorItem.Type.HELMET.getDurability(ModArmorMaterials.GOGGLES_DURABILITY))));
-
-    public static final DeferredHolder<Item, MultiblockBlueprintItem> CLAY_KILN_BLUEPRINT = ITEMS.register(
-        "clay_kiln_blueprint",
-        () -> new MultiblockBlueprintItem(MultiblockBlueprints.CLAY_KILN.id(),
-            new Item.Properties().stacksTo(1)));
-
-    static {
-        // Compile-checked pairing: the sheet item is bound to its definition, replacing an
-        // entire datapack recipe layer that shipped without a single instance.
-        MultiblockBlueprints.bindBlueprintItem(
-            MultiblockBlueprints.CLAY_KILN.id(), () -> CLAY_KILN_BLUEPRINT.get());
-    }
 
     // ---- Bronze tools -------------------------------------------------
 

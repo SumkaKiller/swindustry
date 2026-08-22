@@ -89,32 +89,25 @@ blocks that are no longer there.
 | `primitive_campfire` | sticks and logs. Strike flint against stone over it: 15%, 25%, 50%, 75%, then 100% on the fifth strike. Burns for 60 s, then leaves embers holding 1–5 charcoal and 1–3 soot. |
 | `raw_clay_bricks` | the kiln's shell, tagged `swindustry:kiln_wall` |
 | `clay_kiln_port` | the kiln's mouth and its controller |
-| `drafting_table` | paper, soot ink and a reusable controller sample become a machine blueprint |
-| primitive engineer's goggles | an early wooden sighting frame that outlines unfinished multiblock structures |
-| clay kiln blueprint | reusable plan; clips into worn or held goggles without being consumed |
-| `soot` | campfire residue and the drafting table's first ink |
+| primitive engineer's goggles | an early wooden sighting frame; worn near an unfinished machine it draws its silhouette |
+| `soot` | what a burnt-out campfire leaves behind |
 | bronze tools and armour | tier between stone and iron, but with iron's mining level — see `ModToolTiers` |
 
 Vanilla boats, rafts and their chest variants are deliberately recipe-disabled. They remain valid
 entities for maps and commands, but ordinary planks cannot bypass the pack's shipbuilding
 progression.
 
-### The blueprint loop happens before the first firing
+### Goggles make the machine visible
 
 The island's sugar cane closes the only early-material gap: three cane can be twisted into one
 string. Sticks, paper and that cordage make the primitive goggles without glass or metal. They are a
 wooden sighting frame, not armour and not impossible pre-kiln optics.
 
-Once the first campfire leaves soot, the drafting table takes one paper, one soot and a kiln loading
-port as its sample. Paper and soot are spent; the expensive port is returned untouched. The result
-is a reusable blueprint. Right-clicking a plan while wearing (or holding) a pair of goggles clips
-it into that pair — the sheet is never consumed — and calibrated goggles then inspect only their
-own machine type.
-
-Wearing the goggles draws the unfinished machine in-world: translucent ghost blocks mark positions
-to fill, red boxes mark cavities that must stay clear, and cyan outlines trace every missing wall.
-The preview is fed by a small server verdict packet (`swindustry:structure_verdict`), so what you
-see is exactly what the server matched — never a guess from an older jar.
+Place a loading port where the kiln will stand, put the goggles on, and the unfinished machine
+draws itself around you: translucent ghost blocks mark positions to fill, red boxes mark cavities
+that must stay clear, and cyan outlines trace every missing wall. Sneak-use the port for an exact
+count. The server sends what it matched (`swindustry:structure_verdict`), so what you see is
+exactly what the server sees — never a guess from an older jar.
 
 The kiln is `KilnPatterns.clayKiln()`: 56 clay bricks and the loading port, taken block for block
 from

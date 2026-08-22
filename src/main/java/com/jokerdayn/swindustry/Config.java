@@ -53,14 +53,6 @@ public final class Config {
         .translation("swindustry.configuration.kilnFuelEfficiency")
         .defineInRange("kiln.fuelEfficiency", 1.0, 0.1, 10.0);
 
-    // ---- Debug -------------------------------------------------------------
-
-    public static final ModConfigSpec.BooleanValue DEBUG_SPAWN_COMMANDS = BUILDER
-        .comment("Registers the /swindustry spawn_kiln debug commands and the F12 shortcut.",
-            "Clients read the synced server value, so the keybind goes quiet unless enabled here.")
-        .translation("swindustry.configuration.enableSpawnCommands")
-        .define("debug.enableSpawnCommands", false);
-
     public static final ModConfigSpec SPEC = BUILDER.build();
 
     private Config() {}

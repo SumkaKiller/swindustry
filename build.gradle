@@ -216,14 +216,6 @@ tasks.register('guiTextureChecks', JavaExec) {
     dependsOn checksClasses
 }
 
-tasks.register('blueprintChecks', JavaExec) {
-    group = 'verification'
-    description = 'Verifies early blueprint progression, definitions, translations and item textures.'
-    classpath = sourceSets.checks.runtimeClasspath
-    mainClass = 'com.jokerdayn.swindustry.checks.BlueprintFlowCheck'
-    dependsOn checksClasses
-}
-
 tasks.register('stage1ProgressionChecks', JavaExec) {
     group = 'verification'
     description = 'Verifies Stage 1 bronze equipment tag integration.'
@@ -241,5 +233,5 @@ tasks.register('structurePatternChecks', JavaExec) {
 }
 
 tasks.named('check').configure {
-    dependsOn 'multiblockChecks', 'campfireChecks', 'guiTextureChecks', 'blueprintChecks', 'stage1ProgressionChecks', 'structurePatternChecks'
+    dependsOn 'multiblockChecks', 'campfireChecks', 'guiTextureChecks', 'stage1ProgressionChecks', 'structurePatternChecks'
 }
