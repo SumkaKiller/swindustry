@@ -23,13 +23,14 @@ first and the machines are written on top of it.
 A `MultiblockPattern` can be loaded directly from an exported in-game structure template (`.nbt`) via `StructurePatternLoader` (recommended for medium and large multiblocks) or declared via layer strings with `MultiblockPattern.builder()`.
 
 ```java
-// Loaded directly from an in-game Structure Block template (.nbt)
-public static final MultiblockPattern CLAY_KILN = MultiblockPatterns.register(
-    StructurePatternLoader.builder()
-        .fromResource(SWIndustry.id("structures/clay_kiln.nbt"))
+// KilnPatterns binds the template at server start and recompiles it on every datapack reload:
+public static void initialize(ResourceManager resources) {
+    clayKiln = StructurePatternLoader.builder()
+        .fromResource(resources, SWIndustry.id("structures/clay_kiln")) // datapack-overridable
         .map(ModBlocks.RAW_CLAY_BRICKS, BlockMatcher.tag(ModTags.Blocks.KILN_WALL))
         .controller(ModBlocks.CLAY_KILN_PORT)
-        .build());
+        .build();
+}
 ```
 
 Alternatively, smaller 3x3 machines can still be authored via matrix layers:
@@ -106,15 +107,16 @@ wooden sighting frame, not armour and not impossible pre-kiln optics.
 
 Once the first campfire leaves soot, the drafting table takes one paper, one soot and a kiln loading
 port as its sample. Paper and soot are spent; the expensive port is returned untouched. The result
-is a reusable blueprint. Wear the goggles and use the blueprint (or combine both in a crafting
-grid) to install it, then sneak-use the matching controller.
+is a reusable blueprint. Right-clicking a plan while wearing (or holding) a pair of goggles clips
+it into that pair — the sheet is never consumed — and calibrated goggles then inspect only their
+own machine type.
 
 Wearing the goggles draws the unfinished machine in-world: translucent ghost blocks mark positions
 to fill, red boxes mark cavities that must stay clear, and cyan outlines trace every missing wall.
-The preview is derived locally from the same immutable patterns the server matches against, so it
-never needs a packet of its own.
+The preview is fed by a small server verdict packet (`swindustry:structure_verdict`), so what you
+see is exactly what the server matched — never a guess from an older jar.
 
-The kiln is `KilnPatterns.CLAY_KILN`: 56 clay bricks and the loading port, taken block for block
+The kiln is `KilnPatterns.clayKiln()`: 56 clay bricks and the loading port, taken block for block
 from
 `furnace.nbt`. A 3×3×2 firebox with the corners knocked off, drawing in to a throat and a
 three-block flue. It runs ordinary `minecraft:smelting` recipes — the pack removes the vanilla
@@ -128,7 +130,8 @@ sitting in, and be visibly refused until the shell is rebuilt.
 
 ## Numbers worth tuning
 
-Most balance lives in `swindustry-common.toml` (burn time, fuel efficiency, and cook time). Two
+Most balance lives in `world/serverconfig/swindustry-server.toml` — a **server** config, so the
+values sync to clients automatically and both sides of a strike agree. Two
 datapack-driven values are the most likely to want changing after a playtest:
 
 - **`data/swindustry/recipe/raw_clay_bricks.json`** — four clay balls make two brick blocks, so a
