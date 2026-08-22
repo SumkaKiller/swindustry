@@ -146,13 +146,6 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         }
     };
 
-    private final IItemHandler inputAutomation = new RestrictedItemHandler(new int[] {SLOT_INPUT}, true, false);
-    private final IItemHandler fuelAutomation = new RestrictedItemHandler(new int[] {SLOT_FUEL}, true, false);
-    private final IItemHandler loadingPortAutomation =
-        new RestrictedItemHandler(new int[] {SLOT_INPUT, SLOT_FUEL}, true, false);
-    private final IItemHandler outputAutomation =
-        new RestrictedItemHandler(new int[] {SLOT_OUTPUT, SLOT_FUEL}, false, true);
-
     private int litTime;
     private int litDuration;
     private int cookProgress;
@@ -908,17 +901,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
      * containers.
      */
     public IItemHandler itemHandler(@Nullable Direction side) {
-        if (side == Direction.DOWN) {
-            return outputAutomation;
-        }
-        if (side == Direction.UP) {
-            return inputAutomation;
-        }
-        Direction facing = structureFacing();
-        if (side == null || side == facing) {
-            return loadingPortAutomation;
-        }
-        return fuelAutomation;
+        return KilnInventoryViews.forSide(items, side, structureFacing());
     }
 
     public void dropContents() {
@@ -1019,61 +1002,4 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         }
     }
 
-    /** A slot-mapped view used to keep pipes from extracting fuel or inserting into the output. */
-    private final class RestrictedItemHandler implements IItemHandler {
-        private final int[] slots;
-        private final boolean insertion;
-        private final boolean extraction;
-
-        private RestrictedItemHandler(int[] slots, boolean insertion, boolean extraction) {
-            this.slots = slots.clone();
-            this.insertion = insertion;
-            this.extraction = extraction;
-        }
-
-        @Override
-        public int getSlots() {
-            return slots.length;
-        }
-
-        @Override
-        public ItemStack getStackInSlot(int slot) {
-            return items.getStackInSlot(mapped(slot));
-        }
-
-        @Override
-        public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
-            return insertion ? items.insertItem(mapped(slot), stack, simulate) : stack;
-        }
-
-        @Override
-        public ItemStack extractItem(int slot, int amount, boolean simulate) {
-            if (!extraction) {
-                return ItemStack.EMPTY;
-            }
-            int mappedSlot = mapped(slot);
-            if (mappedSlot == SLOT_FUEL
-                && items.getStackInSlot(mappedSlot).getBurnTime(RecipeType.SMELTING) > 0) {
-                return ItemStack.EMPTY;
-            }
-            return items.extractItem(mappedSlot, amount, simulate);
-        }
-
-        @Override
-        public int getSlotLimit(int slot) {
-            return items.getSlotLimit(mapped(slot));
-        }
-
-        @Override
-        public boolean isItemValid(int slot, ItemStack stack) {
-            return insertion && items.isItemValid(mapped(slot), stack);
-        }
-
-        private int mapped(int slot) {
-            if (slot < 0 || slot >= slots.length) {
-                throw new IndexOutOfBoundsException("Automation slot " + slot + " outside 0.." + (slots.length - 1));
-            }
-            return slots[slot];
-        }
-    }
 }
