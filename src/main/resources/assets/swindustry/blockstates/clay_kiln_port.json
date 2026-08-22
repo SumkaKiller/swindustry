@@ -1,32 +1,62 @@
 {
   "variants": {
-    "facing=north,lit=false": {
+    "cured=false,facing=north,lit=false": {
+      "model": "swindustry:block/clay_kiln_port_raw"
+    },
+    "cured=false,facing=north,lit=true": {
+      "model": "swindustry:block/clay_kiln_port_raw_lit"
+    },
+    "cured=false,facing=east,lit=false": {
+      "model": "swindustry:block/clay_kiln_port_raw",
+      "y": 90
+    },
+    "cured=false,facing=east,lit=true": {
+      "model": "swindustry:block/clay_kiln_port_raw_lit",
+      "y": 90
+    },
+    "cured=false,facing=south,lit=false": {
+      "model": "swindustry:block/clay_kiln_port_raw",
+      "y": 180
+    },
+    "cured=false,facing=south,lit=true": {
+      "model": "swindustry:block/clay_kiln_port_raw_lit",
+      "y": 180
+    },
+    "cured=false,facing=west,lit=false": {
+      "model": "swindustry:block/clay_kiln_port_raw",
+      "y": 270
+    },
+    "cured=false,facing=west,lit=true": {
+      "model": "swindustry:block/clay_kiln_port_raw_lit",
+      "y": 270
+    },
+    "cured=true,facing=north,lit=false": {
       "model": "swindustry:block/clay_kiln_port"
     },
-    "facing=north,lit=true": {
+    "cured=true,facing=north,lit=true": {
       "model": "swindustry:block/clay_kiln_port_lit"
     },
-    "facing=east,lit=false": {
+    "cured=true,facing=east,lit=false": {
       "model": "swindustry:block/clay_kiln_port",
       "y": 90
     },
-    "facing=east,lit=true": {
+    "cured=true,facing=east,lit=true": {
       "model": "swindustry:block/clay_kiln_port_lit",
       "y": 90
     },
-    "facing=south,lit=false": {
+    "cured=true,facing=south,lit=false": {
       "model": "swindustry:block/clay_kiln_port",
       "y": 180
     },
-    "facing=south,lit=true": {
+    "cured=true,facing=south,lit=true": {
       "model": "swindustry:block/clay_kiln_port_lit",
       "y": 180
     },
-    "facing=west,lit=false": {
+    "cured=true,facing=west,lit=false": {
       "model": "swindustry:block/clay_kiln_port",
       "y": 270
     },
-    "facing=west,lit=true": {
+    "cured=true,facing=west,lit=true": {
       "model": "swindustry:block/clay_kiln_port_lit",
       "y": 270
     }

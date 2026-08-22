@@ -46,12 +46,14 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
 
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
     public static final BooleanProperty LIT = BlockStateProperties.LIT;
+    public static final BooleanProperty CURED = BooleanProperty.create("cured");
 
     public ClayKilnPortBlock(Properties properties) {
         super(properties);
         registerDefaultState(stateDefinition.any()
             .setValue(FACING, Direction.NORTH)
-            .setValue(LIT, Boolean.FALSE));
+            .setValue(LIT, Boolean.FALSE)
+            .setValue(CURED, Boolean.FALSE));
     }
 
     @Override
@@ -61,7 +63,7 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING, LIT);
+        builder.add(FACING, LIT, CURED);
     }
 
     @Override

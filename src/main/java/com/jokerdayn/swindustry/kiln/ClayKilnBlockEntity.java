@@ -8,6 +8,7 @@ import com.jokerdayn.swindustry.registry.ModBlockEntities;
 import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.jokerdayn.swindustry.registry.ModRecipes;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.core.BlockPos;
@@ -81,7 +82,6 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     public static final int DATA_COUNT = 9;
 
     public static final int MAX_HEAT = 1000;
-    public static final int WAVE_INTERVAL = 8;
 
     private static final String KEY_ITEMS = "Items";
     private static final String KEY_LIT_TIME = "LitTime";
@@ -95,6 +95,12 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private static final String KEY_CURED = "Cured";
     private static final String KEY_HANDLER_SIZE = "Size";
     private static final int SAVE_INTERVAL = 20;
+
+    /** One brick scheduled to cure at a specific cumulative burning tick. */
+    private record ScheduledBrick(BlockPos pos, int cureTick) {}
+
+    private final List<ScheduledBrick> curingSchedule = new ArrayList<>();
+    private int scheduleIndex;
 
     private final ItemStackHandler items = new ItemStackHandler(SLOT_COUNT) {
         @Override
@@ -263,6 +269,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     @Override
     protected void onFormed(com.jokerdayn.swindustry.multiblock.MultiblockInstance instance) {
         status = KilnStatus.IDLE;
+        curingSchedule.clear();
+        scheduleIndex = 0;
         if (level != null) {
             boolean hasRaw = false;
             for (BlockPos pos : instance.walls()) {
@@ -271,7 +279,14 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                     break;
                 }
             }
-            this.cured = !hasRaw;
+            if (hasRaw) {
+                if (this.cured) {
+                    this.curingProgress = 0;
+                }
+                this.cured = false;
+            } else {
+                this.cured = true;
+            }
         }
     }
 
@@ -283,6 +298,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         cookProgress = 0;
         heat = 0;
         activeJobKey = null;
+        curingSchedule.clear();
+        scheduleIndex = 0;
         status = KilnStatus.INCOMPLETE;
         if (level == null || level.isClientSide || isRemoved()) {
             return;
@@ -354,9 +371,23 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
 
         BlockState currentState = kiln.getBlockState();
         boolean shouldLookLit = operational && kiln.isLit();
-        if (currentState.hasProperty(ClayKilnPortBlock.LIT)
-            && currentState.getValue(ClayKilnPortBlock.LIT) != shouldLookLit) {
-            level.setBlock(pos, currentState.setValue(ClayKilnPortBlock.LIT, shouldLookLit), Block.UPDATE_ALL);
+        boolean shouldLookCured = kiln.isCured();
+        boolean stateChanged = false;
+        BlockState nextState = currentState;
+
+        if (nextState.hasProperty(ClayKilnPortBlock.LIT)
+            && nextState.getValue(ClayKilnPortBlock.LIT) != shouldLookLit) {
+            nextState = nextState.setValue(ClayKilnPortBlock.LIT, shouldLookLit);
+            stateChanged = true;
+        }
+        if (nextState.hasProperty(ClayKilnPortBlock.CURED)
+            && nextState.getValue(ClayKilnPortBlock.CURED) != shouldLookCured) {
+            nextState = nextState.setValue(ClayKilnPortBlock.CURED, shouldLookCured);
+            stateChanged = true;
+        }
+
+        if (stateChanged) {
+            level.setBlock(pos, nextState, Block.UPDATE_ALL);
             dirty = true;
         }
 
@@ -443,104 +474,169 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     }
 
     /**
-     * Cellular automaton chain reaction:
-     * Fires raw clay bricks into cured clay bricks in fast propagating waves spreading from the
-     * heat source outward to the entire kiln.
+     * Thermodynamic curing progression:
+     * Fires raw clay bricks into cured ceramic clay bricks smoothly across their thermal exposure
+     * zones (~155-210 seconds / 3100-4200 ticks) from the combustion chamber out to the vault,
+     * chimney, and massive floor.
+     *
+     * <p>Optimized with an event schedule so steady-state execution costs a single integer comparison
+     * per tick (O(1) with zero block queries when idle).</p>
      */
     private boolean tickCuring(Level level) {
-        if (level.isClientSide || !isLit() || !isFormed()) {
+        if (level.isClientSide || !isLit() || !isFormed() || cured) {
             return false;
         }
 
-        MultiblockInstance instance = instance();
-        if (instance == null) {
-            return false;
+        if (curingSchedule.isEmpty()) {
+            buildCuringSchedule(level);
+            if (curingSchedule.isEmpty()) {
+                this.cured = true;
+                return false;
+            }
         }
 
         curingProgress++;
-        if (curingProgress < WAVE_INTERVAL) {
-            return false;
+
+        boolean changed = false;
+        while (scheduleIndex < curingSchedule.size()) {
+            ScheduledBrick next = curingSchedule.get(scheduleIndex);
+            if (curingProgress < next.cureTick()) {
+                break;
+            }
+
+            BlockPos targetPos = next.pos();
+            BlockState state = level.getBlockState(targetPos);
+            if (state.is(ModBlocks.RAW_CLAY_BRICKS.get())) {
+                level.setBlock(targetPos, ModBlocks.CLAY_BRICKS.get().defaultBlockState(), Block.UPDATE_ALL);
+                spawnCuringEffects(level, targetPos);
+                changed = true;
+            }
+            scheduleIndex++;
         }
-        curingProgress = 0;
 
-        List<BlockPos> rawBricks = new ArrayList<>();
-        List<BlockPos> curedBricks = new ArrayList<>();
+        if (scheduleIndex >= curingSchedule.size()) {
+            this.cured = true;
+            this.curingSchedule.clear();
+            playKilnCompletionSound(level);
+            return true;
+        }
 
-        for (BlockPos wallPos : instance.walls()) {
-            if (wallPos.equals(worldPosition)) {
+        return changed;
+    }
+
+    /**
+     * Builds the sorted curing schedule for all remaining raw clay bricks in the multiblock.
+     */
+    private void buildCuringSchedule(Level level) {
+        MultiblockInstance instance = instance();
+        if (instance == null) {
+            return;
+        }
+
+        curingSchedule.clear();
+        scheduleIndex = 0;
+        int floorY = worldPosition.getY() - 1;
+
+        for (BlockPos pos : instance.walls()) {
+            if (pos.equals(worldPosition)) {
                 continue;
             }
-            BlockState wallState = level.getBlockState(wallPos);
-            if (wallState.is(ModBlocks.RAW_CLAY_BRICKS.get())) {
-                rawBricks.add(wallPos);
-            } else if (wallState.is(ModBlocks.CLAY_BRICKS.get())) {
-                curedBricks.add(wallPos);
+            if (level.getBlockState(pos).is(ModBlocks.RAW_CLAY_BRICKS.get())) {
+                int requiredTicks = calculateBrickRequiredTicks(pos, floorY);
+                curingSchedule.add(new ScheduledBrick(pos, requiredTicks));
             }
         }
 
-        if (rawBricks.isEmpty()) {
-            if (!cured) {
-                cured = true;
-                return true;
-            }
-            return false;
+        curingSchedule.sort(Comparator.comparingInt(ScheduledBrick::cureTick));
+
+        if (curingSchedule.isEmpty()) {
+            this.cured = true;
+            return;
         }
 
-        List<BlockPos> toCure = new ArrayList<>();
+        this.cured = false;
+        // If curingProgress is already higher than or equal to the earliest raw brick in the schedule,
+        // it means raw bricks were placed into a previously advanced or cured kiln.
+        // Reset curingProgress so newly inserted raw bricks undergo their full thermal firing duration.
+        if (curingProgress >= curingSchedule.get(0).cureTick()) {
+            curingProgress = 0;
+        }
+    }
 
-        if (curedBricks.isEmpty()) {
-            // Seed wave: find raw bricks with the lowest Y level (the floor)
-            int minY = Integer.MAX_VALUE;
-            for (BlockPos pos : rawBricks) {
-                minY = Math.min(minY, pos.getY());
+    /**
+     * Calculates the exact curing time required for a brick based on its thermodynamic zone and
+     * position in the kiln geometry.
+     */
+    private static int calculateBrickRequiredTicks(BlockPos pos, int floorY) {
+        int relY = pos.getY() - floorY;
+        float baseSeconds;
+        float spreadSeconds;
+
+        switch (relY) {
+            case 1 -> { // Chamber lower: 155 - 175 s (mean 165s, spread ±10s)
+                baseSeconds = 165.0F;
+                spreadSeconds = 10.0F;
             }
-            for (BlockPos pos : rawBricks) {
-                if (pos.getY() == minY) {
-                    toCure.add(pos);
-                }
+            case 2 -> { // Chamber upper: 165 - 185 s (mean 175s, spread ±10s)
+                baseSeconds = 175.0F;
+                spreadSeconds = 10.0F;
             }
-            // Fallback: if no floor bricks, grab raw bricks closest to the cavity center
-            if (toCure.isEmpty()) {
-                Vec3 center = instance.cavityCenter();
-                for (BlockPos pos : rawBricks) {
-                    if (pos.distToCenterSqr(center.x, center.y, center.z) <= 6.0) {
-                        toCure.add(pos);
-                    }
-                }
+            case 0 -> { // Massive floor: 175 - 200 s (mean 187.5s, spread ±12.5s)
+                baseSeconds = 187.5F;
+                spreadSeconds = 12.5F;
             }
-        } else {
-            // Propagation wave: any raw brick adjacent to at least one already cured brick
-            for (BlockPos rawPos : rawBricks) {
-                boolean adjacentToCured = false;
-                for (BlockPos curedPos : curedBricks) {
-                    int dx = Math.abs(rawPos.getX() - curedPos.getX());
-                    int dy = Math.abs(rawPos.getY() - curedPos.getY());
-                    int dz = Math.abs(rawPos.getZ() - curedPos.getZ());
-                    if (dx <= 1 && dy <= 1 && dz <= 1 && (dx + dy + dz > 0)) {
-                        adjacentToCured = true;
-                        break;
-                    }
-                }
-                if (adjacentToCured) {
-                    toCure.add(rawPos);
-                }
+            case 3 -> { // Vault: 180 - 205 s (mean 192.5s, spread ±12.5s)
+                baseSeconds = 192.5F;
+                spreadSeconds = 12.5F;
+            }
+            case 4 -> { // Chimney: 185 - 210 s (mean 197.5s, spread ±12.5s)
+                baseSeconds = 197.5F;
+                spreadSeconds = 12.5F;
+            }
+            default -> {
+                baseSeconds = 200.0F;
+                spreadSeconds = 10.0F;
             }
         }
 
-        if (toCure.isEmpty()) {
-            toCure.add(rawBricks.get(0));
-        }
+        // Deterministic spread (-spreadSeconds .. +spreadSeconds) based on coordinates
+        long hash = ((long) pos.getX() * 3129871L) ^ ((long) pos.getY() * 116123L) ^ ((long) pos.getZ() * 91871L);
+        float fraction = ((Math.abs(hash) % 10000) / 10000.0F) * 2.0F - 1.0F;
+        float targetSeconds = baseSeconds + (fraction * spreadSeconds);
 
-        // Transform the wave of candidate bricks into cured clay bricks
-        for (BlockPos pos : toCure) {
-            level.setBlock(pos, ModBlocks.CLAY_BRICKS.get().defaultBlockState(), Block.UPDATE_ALL);
-        }
+        return (int) (targetSeconds * 20.0F);
+    }
 
-        if (rawBricks.size() <= toCure.size()) {
-            cured = true;
+    private void spawnCuringEffects(Level level, BlockPos pos) {
+        if (level instanceof ServerLevel serverLevel) {
+            serverLevel.sendParticles(
+                ParticleTypes.POOF,
+                pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5,
+                3, 0.15, 0.15, 0.15, 0.02
+            );
+            serverLevel.sendParticles(
+                ParticleTypes.SMOKE,
+                pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5,
+                2, 0.1, 0.1, 0.1, 0.01
+            );
+            serverLevel.playSound(
+                null, pos,
+                SoundEvents.FIRE_EXTINGUISH,
+                SoundSource.BLOCKS,
+                0.3F, 1.4F + serverLevel.random.nextFloat() * 0.4F
+            );
         }
+    }
 
-        return true;
+    private void playKilnCompletionSound(Level level) {
+        if (level instanceof ServerLevel serverLevel) {
+            serverLevel.playSound(
+                null, worldPosition,
+                SoundEvents.PLAYER_LEVELUP,
+                SoundSource.BLOCKS,
+                0.6F, 1.2F
+            );
+        }
     }
 
     private void consumeFuel(Level level, ItemStack fuel) {

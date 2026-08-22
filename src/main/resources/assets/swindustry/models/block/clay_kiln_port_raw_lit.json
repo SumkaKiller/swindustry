@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/orientable",
+  "textures": {
+    "top": "swindustry:block/raw_clay_bricks",
+    "front": "swindustry:block/raw_clay_kiln_port_front_lit",
+    "side": "swindustry:block/raw_clay_bricks"
+  }
+}
