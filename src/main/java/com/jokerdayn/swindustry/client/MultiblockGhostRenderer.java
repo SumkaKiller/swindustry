@@ -50,6 +50,7 @@ public final class MultiblockGhostRenderer {
     public static void onClientLogout(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
         CACHED_CONTROLLER_POSITIONS.clear();
         lastScanTick = -1;
+        StructureVerdicts.clear();
     }
 
     @SubscribeEvent
@@ -83,7 +84,23 @@ public final class MultiblockGhostRenderer {
         for (BlockPos cPos : controllers) {
             BlockEntity be = level.getBlockEntity(cPos);
             if (be instanceof MultiblockControllerEntity controller && !controller.isFormed()) {
-                for (MultiblockPattern.InspectionCell cell : controller.inspectStructure()) {
+                // Prefer the server's verdict; fall back to a local pattern walk only when no
+                // verdict has arrived yet (freshly placed controller, packet loss, singleplayer
+                // before first tick).
+                var cachedCells = StructureVerdicts.lookup(cPos);
+                List<MultiblockPattern.InspectionCell> inspection;
+                if (cachedCells != null) {
+                    inspection = new ArrayList<>(cachedCells.size());
+                    for (var c : cachedCells) {
+                        inspection.add(new MultiblockPattern.InspectionCell(
+                            net.minecraft.core.BlockPos.of(c.packed()), ' ',
+                            BlockMatcher.of(BlockMatcher.Role.values()[c.roleOrdinal()], s -> false),
+                            false));
+                    }
+                } else {
+                    inspection = controller.inspectStructure();
+                }
+                for (MultiblockPattern.InspectionCell cell : inspection) {
                     if (!cell.matches()) {
                         BlockPos pos = cell.pos();
                         if (cell.expected().role() == BlockMatcher.Role.WALL) {

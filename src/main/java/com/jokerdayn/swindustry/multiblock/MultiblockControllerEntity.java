@@ -1,5 +1,7 @@
 package com.jokerdayn.swindustry.multiblock;
 
+import com.jokerdayn.swindustry.multiblock.network.KilnStructurePayload;
+import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -157,7 +159,43 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
             // save belonged to a machine that no longer exists.
             onLoadedBroken();
         }
+        // Server-authoritative verdict push: broken machines broadcast their disagreement list
+        // (≤1 Hz each); a fresh formation clears any stale ghost cache on clients.
+        if (level instanceof net.minecraft.server.level.ServerLevel serverLevel) {
+            if (formed == null && !validationDeferred) {
+                broadcastVerdict(serverLevel);
+            } else if (previous == null && formed != null) {
+                send(new com.jokerdayn.swindustry.multiblock.network.KilnStructurePayload(
+                    worldPosition.immutable(), true, false, java.util.List.of()), serverLevel);
+            }
+        }
         return formed != null;
+    }
+
+    private void broadcastVerdict(net.minecraft.server.level.ServerLevel serverLevel) {
+        Direction facing = controllerFacing(getBlockState());
+        List<KilnStructurePayload.Cell> cells = new ArrayList<>();
+        if (facing != null) {
+            for (MultiblockPattern.InspectionCell cell : pattern().inspect(level, worldPosition, facing)) {
+                if (!cell.matches()) {
+                    cells.add(new KilnStructurePayload.Cell(
+                        cell.pos().asLong(), cell.expected().role().ordinal()));
+                }
+            }
+        }
+        send(new KilnStructurePayload(worldPosition.immutable(), false, validationDeferred, cells), serverLevel);
+    }
+
+    /** Direct-to-trackers send bounded to the same 8-block radius the preview itself uses. */
+    private void send(KilnStructurePayload payload, net.minecraft.server.level.ServerLevel serverLevel) {
+        double centerX = worldPosition.getX() + 0.5;
+        double centerZ = worldPosition.getZ() + 0.5;
+        for (net.minecraft.server.level.ServerPlayer player : serverLevel.players()) {
+            if (player.level() == serverLevel
+                && player.distanceToSqr(centerX, worldPosition.getY() + 0.5, centerZ) <= 64.0 * 64.0) {
+                player.connection.send(payload);
+            }
+        }
     }
 
     /**
