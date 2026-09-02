@@ -2,6 +2,7 @@ package com.jokerdayn.swindustry.kiln;
 
 import com.jokerdayn.swindustry.item.PrimitiveEngineerGogglesItem;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
+import com.jokerdayn.swindustry.registry.ModTags;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -157,20 +158,51 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
         level.addParticle(ParticleTypes.FLAME, mouthX, pos.getY() + 0.25 + random.nextDouble() * 0.2, mouthZ,
             0.0, 0.0, 0.0);
 
-        // Smoke leaving the flue. The flue top sits at a fixed offset from the port, so the client
-        // can place the plume itself without the server sending a single packet for it.
-        if (random.nextInt(3) == 0) {
-            BlockPos flue = KilnPatterns.clayKiln().toWorld(pos, facing, FLUE_TOP);
+        // Smoke leaving the flue. If the chimney is choked, smoke cannot escape upwards,
+        // and thick smoke billows from the mouth instead.
+        BlockPos flue = KilnPatterns.clayKiln().toWorld(pos, facing, FLUE_TOP);
+        BlockPos chimneyExit = flue;
+        boolean choked = false;
+
+        for (int step = 1; step <= 4; step++) {
+            BlockPos above = chimneyExit.above();
+            BlockState aboveState = level.getBlockState(above);
+            if (!aboveState.isAir() && !aboveState.canBeReplaced()) {
+                choked = true;
+                break;
+            }
+            if (level.getBlockState(above.north()).is(ModTags.Blocks.KILN_WALL)
+                && level.getBlockState(above.south()).is(ModTags.Blocks.KILN_WALL)
+                && level.getBlockState(above.east()).is(ModTags.Blocks.KILN_WALL)
+                && level.getBlockState(above.west()).is(ModTags.Blocks.KILN_WALL)) {
+                chimneyExit = above;
+            } else {
+                break;
+            }
+        }
+        if (!choked) {
+            BlockState exitAbove = level.getBlockState(chimneyExit.above());
+            if (!exitAbove.isAir() && !exitAbove.canBeReplaced()) {
+                choked = true;
+            }
+        }
+
+        if (choked) {
+            if (random.nextInt(2) == 0) {
+                level.addParticle(ParticleTypes.CAMPFIRE_COSY_SMOKE, mouthX, pos.getY() + 0.35 + random.nextDouble() * 0.2, mouthZ,
+                    facing.getStepX() * 0.03, 0.03, facing.getStepZ() * 0.03);
+            }
+        } else if (random.nextInt(3) == 0) {
             level.addAlwaysVisibleParticle(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, true,
-                flue.getX() + 0.5 + (random.nextDouble() - 0.5) * 0.3,
-                flue.getY() + 0.8,
-                flue.getZ() + 0.5 + (random.nextDouble() - 0.5) * 0.3,
+                chimneyExit.getX() + 0.5 + (random.nextDouble() - 0.5) * 0.3,
+                chimneyExit.getY() + 0.8,
+                chimneyExit.getZ() + 0.5 + (random.nextDouble() - 0.5) * 0.3,
                 0.0, 0.06, 0.0);
         }
     }
 
     /** Where the flue opens, relative to the port, in the pattern's authored orientation. */
-    private static final Vec3i FLUE_TOP = new Vec3i(0, 3, 2);
+    public static final Vec3i FLUE_TOP = new Vec3i(0, 3, 2);
 
     // ------------------------------------------------------------------
 

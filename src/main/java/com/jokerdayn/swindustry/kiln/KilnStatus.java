@@ -11,7 +11,8 @@ public enum KilnStatus {
     NEEDS_FUEL(3, "needs_fuel"),
     OUTPUT_BLOCKED(4, "output_blocked"),
     TIER_TOO_LOW(5, "tier_too_low"),
-    WORKING(6, "working");
+    WORKING(6, "working"),
+    CHOKED(7, "choked");
 
     private static final KilnStatus[] BY_ID = values();
 

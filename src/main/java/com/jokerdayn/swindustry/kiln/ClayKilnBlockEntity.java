@@ -6,6 +6,7 @@ import com.jokerdayn.swindustry.multiblock.MultiblockInstance;
 import com.jokerdayn.swindustry.multiblock.MultiblockPattern;
 import com.jokerdayn.swindustry.registry.ModBlockEntities;
 import com.jokerdayn.swindustry.registry.ModBlocks;
+import com.jokerdayn.swindustry.registry.ModItems;
 import com.jokerdayn.swindustry.registry.ModRecipes;
 import com.jokerdayn.swindustry.registry.ModTags;
 import it.unimi.dsi.fastutil.longs.Long2IntOpenHashMap;
@@ -128,6 +129,17 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
 
     /** Set when something may have touched the interior; triggers one bounded flood scan. */
     private boolean floodCheckQueued;
+
+    /**
+     * Chimney natural ventilation:
+     * - {@link #chimneyChoked}: true if flue exit is blocked by a solid block (choked / closed damper);
+     *   drops heat ceiling to smoldering (250) and billows smoke from the mouth.
+     * - {@link #extraChimneyHeight}: number of valid chimney courses (1 to 4) built above the base flue;
+     *   each extra block speeds up heating and increases maximum heat ceiling.
+     */
+    private int extraChimneyHeight;
+    private boolean chimneyChoked;
+    private long draftSampledAt = Long.MIN_VALUE;
 
     private final ItemStackHandler items = new ItemStackHandler(SLOT_COUNT) {
         @Override
@@ -265,7 +277,79 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         if (ceilingCache < 0) {
             refreshShellCensus();
         }
-        return ceilingCache;
+        if (chimneyChoked) {
+            // Choked damper: fire is smothered down to smoldering heat (250 / 25%)
+            return 250;
+        }
+        int max = ceilingCache;
+        if (isCured() && extraChimneyHeight > 0) {
+            // Natural draft bonus: each extra chimney course raises maximum heat ceiling by 25 (up to 1100)
+            max = Math.min(1100, max + extraChimneyHeight * 25);
+        }
+        return max;
+    }
+
+    public boolean isChimneyChoked() {
+        return chimneyChoked;
+    }
+
+    public int extraChimneyHeight() {
+        return extraChimneyHeight;
+    }
+
+    /**
+     * Checks chimney ventilation and natural draft.
+     * Evaluates up to 4 additional chimney courses above the base multiblock flue opening.
+     * If the opening is capped or obstructed, the kiln becomes choked (smoldering mode).
+     */
+    private void updateDraft(Level level) {
+        long now = level.getGameTime();
+        if (draftSampledAt != Long.MIN_VALUE && now - draftSampledAt < 20) {
+            return;
+        }
+        draftSampledAt = now;
+
+        Direction facing = controllerFacing(getBlockState());
+        if (facing == null) {
+            extraChimneyHeight = 0;
+            chimneyChoked = false;
+            return;
+        }
+
+        BlockPos flue = pattern().toWorld(worldPosition, facing, ClayKilnPortBlock.FLUE_TOP);
+        BlockPos chimneyExit = flue;
+        boolean choked = false;
+        int extra = 0;
+
+        for (int step = 1; step <= 4; step++) {
+            BlockPos above = chimneyExit.above();
+            BlockState aboveState = level.getBlockState(above);
+            if (!aboveState.isAir() && !aboveState.canBeReplaced()) {
+                choked = true;
+                break;
+            }
+            if (level.getBlockState(above.north()).is(ModTags.Blocks.KILN_WALL)
+                && level.getBlockState(above.south()).is(ModTags.Blocks.KILN_WALL)
+                && level.getBlockState(above.east()).is(ModTags.Blocks.KILN_WALL)
+                && level.getBlockState(above.west()).is(ModTags.Blocks.KILN_WALL)) {
+                chimneyExit = above;
+                extra = step;
+            } else {
+                break;
+            }
+        }
+        if (!choked) {
+            BlockState exitAbove = level.getBlockState(chimneyExit.above());
+            if (!exitAbove.isAir() && !exitAbove.canBeReplaced()) {
+                choked = true;
+            }
+        }
+
+        if (this.chimneyChoked != choked) {
+            this.chimneyChoked = choked;
+            invalidateCeiling();
+        }
+        this.extraChimneyHeight = extra;
     }
 
     /**
@@ -319,6 +403,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         // Something may have entered or obstructed the interior; queue one bounded scan instead
         // of polling the cavity every tick.
         floodCheckQueued = true;
+        draftSampledAt = Long.MIN_VALUE;
     }
 
     public float curedRatio() {
@@ -394,6 +479,9 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         activeJobKey = null;
         rawWalls.clear();
         soakStarts.clear();
+        extraChimneyHeight = 0;
+        chimneyChoked = false;
+        draftSampledAt = Long.MIN_VALUE;
         status = KilnStatus.INCOMPLETE;
         invalidateCeiling();
     }
@@ -474,13 +562,15 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 dirty = true;
             }
         } else {
+            kiln.updateDraft(level);
             if (kiln.litTime > 0) {
                 kiln.litTime--;
             }
             if (kiln.isLit()) {
                 int effectiveMax = kiln.effectiveMaxHeat();
                 if (kiln.heat < effectiveMax) {
-                    kiln.heat = Math.min(effectiveMax, kiln.heat + 2);
+                    int heatRate = kiln.chimneyChoked ? 1 : (2 + kiln.extraChimneyHeight);
+                    kiln.heat = Math.min(effectiveMax, kiln.heat + heatRate);
                     dirty = true;
                 } else if (kiln.heat > effectiveMax) {
                     kiln.heat = Math.max(effectiveMax, kiln.heat - 1);
@@ -495,6 +585,20 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 }
             }
             dirty = kiln.runCookingStep(level) || dirty;
+        }
+
+        if (operational && kiln.isLit() && kiln.chimneyChoked && level instanceof ServerLevel serverLevel) {
+            if (level.getGameTime() % 16 == 0) {
+                Direction facing = kiln.controllerFacing(state);
+                if (facing != null) {
+                    double mouthX = pos.getX() + 0.5 + facing.getStepX() * 0.52;
+                    double mouthY = pos.getY() + 0.4;
+                    double mouthZ = pos.getZ() + 0.5 + facing.getStepZ() * 0.52;
+                    serverLevel.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
+                        mouthX, mouthY, mouthZ, 2,
+                        facing.getStepX() * 0.05, 0.04, facing.getStepZ() * 0.05, 0.01);
+                }
+            }
         }
 
         BlockState currentState = kiln.getBlockState();
@@ -536,13 +640,13 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         ItemStack fuel = items.getStackInSlot(SLOT_FUEL);
         boolean dirty = false;
         if (input.isEmpty()) {
-            status = KilnStatus.IDLE;
+            status = chimneyChoked ? KilnStatus.CHOKED : KilnStatus.IDLE;
             return coolProgress();
         }
 
         Job job = findJob(level, input);
         if (job == null || job.result().isEmpty()) {
-            status = KilnStatus.INVALID_RECIPE;
+            status = chimneyChoked ? KilnStatus.CHOKED : KilnStatus.INVALID_RECIPE;
             return coolProgress();
         }
         if (!job.isAllowedIn(tier())) {
@@ -578,7 +682,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             return coolProgress() || dirty;
         }
 
-        status = KilnStatus.WORKING;
+        status = chimneyChoked ? KilnStatus.CHOKED : KilnStatus.WORKING;
         cookProgress++;
         if (cookProgress >= cookDuration) {
             cookProgress = 0;
@@ -767,7 +871,10 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     }
 
     private void finish(Level level, Job job) {
-        ItemStack remainingInput = items.getStackInSlot(SLOT_INPUT).copy();
+        ItemStack inputStack = items.getStackInSlot(SLOT_INPUT);
+        boolean wasCharrable = inputStack.is(ModTags.Items.KILN_CHARRABLE);
+
+        ItemStack remainingInput = inputStack.copy();
         remainingInput.shrink(1);
         items.setStackInSlot(SLOT_INPUT, remainingInput);
 
@@ -784,15 +891,22 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             activeJobKey = null;
         }
 
+        Direction facing = controllerFacing(getBlockState());
+        BlockPos mouth = facing == null ? worldPosition : worldPosition.relative(facing);
+
+        // Smoldering wood charring produces soot alongside charcoal
+        if (wasCharrable && chimneyChoked && !level.isClientSide) {
+            Containers.dropItemStack(level, mouth.getX() + 0.5, mouth.getY() + 0.5, mouth.getZ() + 0.5,
+                new ItemStack(ModItems.SOOT.get()));
+        }
+
         // Experience leaves the kiln as it is earned rather than being banked against the output
         // slot. One less thing to serialise, and a visible sign the kiln did something.
         storedExperience += job.experience();
-        if (storedExperience >= 1.0F && level instanceof net.minecraft.server.level.ServerLevel server) {
+        if (storedExperience >= 1.0F && level instanceof ServerLevel server) {
             int whole = (int) storedExperience;
             storedExperience -= whole;
-            Direction facing = controllerFacing(getBlockState());
-            BlockPos mouth = facing == null ? worldPosition : worldPosition.relative(facing);
-            ExperienceOrb.award(server, net.minecraft.world.phys.Vec3.atCenterOf(mouth), whole);
+            ExperienceOrb.award(server, Vec3.atCenterOf(mouth), whole);
         }
     }
 
@@ -973,6 +1087,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             ? loadedExperience
             : 0.0F;
         heat = Mth.clamp(tag.getInt(KEY_HEAT), 0, MAX_HEAT);
+        chimneyChoked = tag.getBoolean("Choked");
+        extraChimneyHeight = Math.max(0, tag.getInt("ExtraChimney"));
         activeJobKey = cookProgress > 0 && tag.contains(KEY_ACTIVE_JOB, Tag.TAG_STRING)
             ? tag.getString(KEY_ACTIVE_JOB)
             : null;
@@ -997,6 +1113,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         tag.put(KEY_SOAK_STARTS, soakStartList);
         tag.putFloat(KEY_EXPERIENCE, storedExperience);
         tag.putInt(KEY_HEAT, heat);
+        tag.putBoolean("Choked", chimneyChoked);
+        tag.putInt("ExtraChimney", extraChimneyHeight);
         if (cookProgress > 0 && activeJobKey != null) {
             tag.putString(KEY_ACTIVE_JOB, activeJobKey);
         }
