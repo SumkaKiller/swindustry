@@ -199,16 +199,15 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
         }
 
         if (choked) {
-            if (random.nextInt(2) == 0) {
-                level.addParticle(ParticleTypes.LARGE_SMOKE, mouthX, pos.getY() + 0.35 + random.nextDouble() * 0.2, mouthZ,
-                    facing.getStepX() * 0.03, 0.03, facing.getStepZ() * 0.03);
-            }
-        } else if (random.nextInt(3) == 0) {
-            level.addAlwaysVisibleParticle(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, true,
-                chimneyExit.getX() + 0.5 + (random.nextDouble() - 0.5) * 0.3,
-                chimneyExit.getY() + 0.8,
-                chimneyExit.getZ() + 0.5 + (random.nextDouble() - 0.5) * 0.3,
-                0.0, 0.06, 0.0);
+            level.addParticle(ParticleTypes.SMOKE, mouthX, pos.getY() + 0.35 + random.nextDouble() * 0.2, mouthZ,
+                facing.getStepX() * 0.015, 0.01, facing.getStepZ() * 0.01);
+        } else {
+            // Small, frequent smoke at chimney exit that drifts gently and does not shoot up into the sky
+            level.addParticle(ParticleTypes.SMOKE,
+                chimneyExit.getX() + 0.5 + (random.nextDouble() - 0.5) * 0.25,
+                chimneyExit.getY() + 0.85 + random.nextDouble() * 0.1,
+                chimneyExit.getZ() + 0.5 + (random.nextDouble() - 0.5) * 0.25,
+                (random.nextDouble() - 0.5) * 0.005, 0.015 + random.nextDouble() * 0.01, (random.nextDouble() - 0.5) * 0.005);
         }
     }
 

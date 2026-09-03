@@ -544,12 +544,12 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         float heatRatio = Math.max(0.1F, (float) heat / MAX_HEAT);
 
         long now = level.getGameTime();
-        if (now - lastQuenchSoundAt >= 25) {
+        if (now - lastQuenchSoundAt >= 15) {
             lastQuenchSoundAt = now;
             // Hotter kilns hiss with greater volume and higher steam pitch
-            float candleVol = 0.25F + 0.30F * heatRatio;
-            float sizzleVol = 0.12F + 0.23F * heatRatio;
-            float pitch = 1.35F + 0.35F * heatRatio + level.random.nextFloat() * 0.15F;
+            float candleVol = 0.35F + 0.25F * heatRatio;
+            float sizzleVol = 0.55F + 0.35F * heatRatio;
+            float pitch = 1.25F + 0.35F * heatRatio + level.random.nextFloat() * 0.15F;
 
             level.playSound(null, contactPos, SoundEvents.CANDLE_EXTINGUISH, SoundSource.BLOCKS,
                 candleVol, pitch * 0.85F);
@@ -557,35 +557,21 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 sizzleVol, pitch);
         }
 
-        // Particle counts scale up with temperature: barely warm gives a small puff, incandescent produces thick steam
-        int smokeCount = Math.max(2, Math.round((internal ? 14 : 8) * heatRatio));
-        int largeSmokeCount = heat >= 350 ? Math.max(1, Math.round((internal ? 4 : 2) * heatRatio)) : 0;
-        int poofCount = Math.max(1, Math.round((internal ? 3 : 2) * heatRatio));
-
-        double spread = 0.15 + 0.15 * heatRatio;
-        double speed = 0.015 + 0.035 * heatRatio;
-
+        // Small, frequent steam particles that do not fly up into the air or scatter across the map
+        int smokeCount = Math.max(2, Math.round((internal ? 6 : 3) * heatRatio));
         level.sendParticles(ParticleTypes.SMOKE,
             contactPos.getX() + 0.5, contactPos.getY() + 0.5, contactPos.getZ() + 0.5,
-            smokeCount, spread, spread, spread, speed);
-        if (largeSmokeCount > 0) {
-            level.sendParticles(ParticleTypes.LARGE_SMOKE,
-                contactPos.getX() + 0.5, contactPos.getY() + 0.5, contactPos.getZ() + 0.5,
-                largeSmokeCount, spread * 0.8, spread * 0.8, spread * 0.8, speed * 0.8);
-        }
-        level.sendParticles(ParticleTypes.POOF,
-            contactPos.getX() + 0.5, contactPos.getY() + 0.5, contactPos.getZ() + 0.5,
-            poofCount, spread * 0.8, spread * 0.8, spread * 0.8, speed * 0.7);
+            smokeCount, 0.12, 0.05, 0.12, 0.005);
     }
 
     private void playRainSizzle(ServerLevel level, BlockPos pos) {
         long now = level.getGameTime();
-        if (now - lastRainSoundAt >= 40) {
+        if (now - lastRainSoundAt >= 12) {
             lastRainSoundAt = now;
             float heatRatio = Math.max(0.1F, (float) heat / MAX_HEAT);
-            float candleVol = 0.10F + 0.18F * heatRatio;
-            float sizzleVol = 0.05F + 0.12F * heatRatio;
-            float pitch = 1.6F + 0.3F * heatRatio + level.random.nextFloat() * 0.15F;
+            float candleVol = 0.30F + 0.25F * heatRatio;
+            float sizzleVol = 0.50F + 0.35F * heatRatio;
+            float pitch = 1.30F + 0.35F * heatRatio + level.random.nextFloat() * 0.15F;
 
             level.playSound(null, pos, SoundEvents.CANDLE_EXTINGUISH, SoundSource.BLOCKS,
                 candleVol, pitch * 0.85F);
@@ -740,27 +726,22 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                     dirty = true;
                 }
                 if (level instanceof ServerLevel serverLevel) {
-                    float heatFraction = (float) kiln.heat / MAX_HEAT;
-                    int particleInterval = kiln.heat >= 650 ? 4 : (kiln.heat >= 250 ? 8 : 14);
+                    // Small, frequent rain steam particles across the exposed hot roof bricks
+                    int particleInterval = kiln.heat >= 600 ? 1 : (kiln.heat >= 250 ? 2 : 3);
                     if (level.getGameTime() % particleInterval == 0 && !kiln.skyExposedBlocks.isEmpty()) {
                         BlockPos randomExposed = kiln.skyExposedBlocks.get(level.random.nextInt(kiln.skyExposedBlocks.size()));
                         if (level.isRainingAt(randomExposed.above())) {
-                            int smokeCount = kiln.heat >= 650 ? 3 : (kiln.heat >= 250 ? 2 : 1);
-                            double spread = 0.10 + 0.12 * heatFraction;
-                            double speed = 0.01 + 0.025 * heatFraction;
                             serverLevel.sendParticles(ParticleTypes.SMOKE,
-                                randomExposed.getX() + 0.5, randomExposed.getY() + 1.05, randomExposed.getZ() + 0.5,
-                                smokeCount, spread, 0.05, spread, speed);
-                            if (kiln.heat >= 500) {
-                                serverLevel.sendParticles(ParticleTypes.POOF,
-                                    randomExposed.getX() + 0.5, randomExposed.getY() + 1.05, randomExposed.getZ() + 0.5,
-                                    1, spread, 0.05, spread, speed);
-                            }
+                                randomExposed.getX() + 0.5, randomExposed.getY() + 1.02, randomExposed.getZ() + 0.5,
+                                1, 0.15, 0.02, 0.15, 0.002);
                         }
                     }
-                    int soundInterval = kiln.heat >= 750 ? 25 : (kiln.heat >= 350 ? 40 : 60);
-                    if (kiln.heat >= 100 && level.random.nextInt(soundInterval) == 0) {
-                        kiln.playRainSizzle(serverLevel, pos);
+                    if (kiln.heat >= 100 && !kiln.skyExposedBlocks.isEmpty()
+                        && level.random.nextInt(kiln.heat >= 500 ? 10 : 20) == 0) {
+                        BlockPos soundPos = kiln.skyExposedBlocks.get(level.random.nextInt(kiln.skyExposedBlocks.size()));
+                        if (level.isRainingAt(soundPos.above())) {
+                            kiln.playRainSizzle(serverLevel, soundPos);
+                        }
                     }
                 }
             }
@@ -773,14 +754,13 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 if (level.isRainingAt(pos.above())) {
                     coolRate += 2;
                     if (level instanceof ServerLevel serverLevel) {
-                        float heatFraction = (float) kiln.heat / MAX_HEAT;
-                        int interval = kiln.heat >= 500 ? 5 : 10;
+                        int interval = kiln.heat >= 500 ? 2 : 4;
                         if (level.getGameTime() % interval == 0) {
                             serverLevel.sendParticles(ParticleTypes.SMOKE,
-                                pos.getX() + 0.5, pos.getY() + 1.05, pos.getZ() + 0.5,
-                                kiln.heat >= 500 ? 2 : 1, 0.15, 0.05, 0.15, 0.01 + 0.02 * heatFraction);
+                                pos.getX() + 0.5, pos.getY() + 1.02, pos.getZ() + 0.5,
+                                1, 0.12, 0.02, 0.12, 0.002);
                         }
-                        if (level.random.nextInt(kiln.heat >= 500 ? 30 : 50) == 0) {
+                        if (level.random.nextInt(kiln.heat >= 500 ? 15 : 25) == 0) {
                             kiln.playRainSizzle(serverLevel, pos);
                         }
                     }
@@ -824,15 +804,15 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         }
 
         if (operational && kiln.isLit() && kiln.chimneyChoked && level instanceof ServerLevel serverLevel) {
-            if (level.getGameTime() % 16 == 0) {
+            if (level.getGameTime() % 8 == 0) {
                 Direction facing = kiln.controllerFacing(state);
                 if (facing != null) {
                     double mouthX = pos.getX() + 0.5 + facing.getStepX() * 0.52;
                     double mouthY = pos.getY() + 0.4;
                     double mouthZ = pos.getZ() + 0.5 + facing.getStepZ() * 0.52;
-                    serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE,
-                        mouthX, mouthY, mouthZ, 2,
-                        facing.getStepX() * 0.05, 0.04, facing.getStepZ() * 0.05, 0.01);
+                    serverLevel.sendParticles(ParticleTypes.SMOKE,
+                        mouthX, mouthY, mouthZ, 1,
+                        facing.getStepX() * 0.02, 0.01, facing.getStepZ() * 0.02, 0.005);
                 }
             }
         }
@@ -1077,14 +1057,9 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private void spawnCuringEffects(Level level, BlockPos pos) {
         if (level instanceof ServerLevel serverLevel) {
             serverLevel.sendParticles(
-                ParticleTypes.POOF,
-                pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5,
-                3, 0.15, 0.15, 0.15, 0.02
-            );
-            serverLevel.sendParticles(
                 ParticleTypes.SMOKE,
                 pos.getX() + 0.5, pos.getY() + 0.6, pos.getZ() + 0.5,
-                2, 0.1, 0.1, 0.1, 0.01
+                4, 0.12, 0.05, 0.12, 0.005
             );
             serverLevel.playSound(
                 null, pos,
