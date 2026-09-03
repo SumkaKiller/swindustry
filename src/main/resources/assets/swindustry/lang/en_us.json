@@ -30,6 +30,8 @@
   "container.swindustry.clay_kiln.status.tier_too_low": "A hotter kiln is required",
   "container.swindustry.clay_kiln.status.working": "Firing",
   "container.swindustry.clay_kiln.status.choked": "Flue choked (smoldering)",
+  "container.swindustry.clay_kiln.status.too_cold": "Too cold to melt",
+  "container.swindustry.clay_kiln.status.warming_up": "Warming up (slow smelting)",
   "container.swindustry.clay_kiln.tier": "TIER %s",
   "container.swindustry.clay_kiln.tier_tooltip": "Kiln tier: %s",
   "container.swindustry.clay_kiln.slot.input": "Material — upper slot",

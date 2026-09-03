@@ -137,6 +137,17 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
         super.onRemove(state, level, pos, newState, movedByPiston);
     }
 
+    @Override
+    protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock,
+                                   BlockPos fromPos, boolean isMoving) {
+        if (!level.isClientSide && level.getBlockEntity(pos) instanceof ClayKilnBlockEntity kiln) {
+            if (level.getFluidState(fromPos).is(net.minecraft.tags.FluidTags.WATER)) {
+                kiln.notifyWaterContact(fromPos);
+            }
+        }
+        super.neighborChanged(state, level, pos, neighborBlock, fromPos, isMoving);
+    }
+
     // ------------------------------------------------------------------
 
     @Override
@@ -159,7 +170,7 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
             0.0, 0.0, 0.0);
 
         // Smoke leaving the flue. If the chimney is choked, smoke cannot escape upwards,
-        // and thick smoke billows from the mouth instead.
+        // and thick black smoke billows from the mouth instead.
         BlockPos flue = KilnPatterns.clayKiln().toWorld(pos, facing, FLUE_TOP);
         BlockPos chimneyExit = flue;
         boolean choked = false;
@@ -189,7 +200,7 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
 
         if (choked) {
             if (random.nextInt(2) == 0) {
-                level.addParticle(ParticleTypes.CAMPFIRE_COSY_SMOKE, mouthX, pos.getY() + 0.35 + random.nextDouble() * 0.2, mouthZ,
+                level.addParticle(ParticleTypes.LARGE_SMOKE, mouthX, pos.getY() + 0.35 + random.nextDouble() * 0.2, mouthZ,
                     facing.getStepX() * 0.03, 0.03, facing.getStepZ() * 0.03);
             }
         } else if (random.nextInt(3) == 0) {

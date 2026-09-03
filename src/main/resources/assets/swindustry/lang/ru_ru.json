@@ -30,6 +30,8 @@
   "container.swindustry.clay_kiln.status.tier_too_low": "Нужна более жаркая печь",
   "container.swindustry.clay_kiln.status.working": "Идёт обжиг",
   "container.swindustry.clay_kiln.status.choked": "Дымоход перекрыт (тление)",
+  "container.swindustry.clay_kiln.status.too_cold": "Недостаточно жара для плавки",
+  "container.swindustry.clay_kiln.status.warming_up": "Прогрев (замедленная плавка)",
   "container.swindustry.clay_kiln.tier": "УР. %s",
   "container.swindustry.clay_kiln.tier_tooltip": "Уровень печи: %s",
   "container.swindustry.clay_kiln.slot.input": "Материал — верхний слот",

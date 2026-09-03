@@ -135,8 +135,10 @@ public class ClayKilnScreen extends AbstractContainerScreen<ClayKilnMenu> {
                 "container.swindustry.clay_kiln.burn_time", formatTicks(menu.fuelTicksRemaining())),
                 mouseX, mouseY);
         } else if (isHovering(ARROW_X, ARROW_Y, ARROW_WIDTH, ARROW_HEIGHT, mouseX, mouseY)) {
-            graphics.renderTooltip(font, Component.translatable(
-                "container.swindustry.clay_kiln.progress", menu.cookPercent()), mouseX, mouseY);
+            List<Component> tooltips = new ArrayList<>();
+            tooltips.add(Component.translatable("container.swindustry.clay_kiln.progress", menu.cookPercent()));
+            tooltips.add(menu.status().label());
+            graphics.renderComponentTooltip(font, tooltips, mouseX, mouseY);
         }
     }
 

@@ -12,7 +12,9 @@ public enum KilnStatus {
     OUTPUT_BLOCKED(4, "output_blocked"),
     TIER_TOO_LOW(5, "tier_too_low"),
     WORKING(6, "working"),
-    CHOKED(7, "choked");
+    CHOKED(7, "choked"),
+    TOO_COLD(8, "too_cold"),
+    WARMING_UP(9, "warming_up");
 
     private static final KilnStatus[] BY_ID = values();
 

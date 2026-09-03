@@ -40,13 +40,19 @@ public record KilnRecipe(
     ItemStack result,
     float experience,
     int cookingTime,
-    int minTier
+    int minTier,
+    int requiredHeat
 ) implements Recipe<SingleRecipeInput> {
 
     /** What a raw clay kiln is worth. Every later shell material raises this. */
     public static final int TIER_CLAY = 1;
 
     public static final int DEFAULT_COOKING_TIME = 200;
+    public static final int DEFAULT_REQUIRED_HEAT = 850;
+
+    public KilnRecipe(Ingredient ingredient, ItemStack result, float experience, int cookingTime, int minTier) {
+        this(ingredient, result, experience, cookingTime, minTier, DEFAULT_REQUIRED_HEAT);
+    }
 
     @Override
     public boolean matches(SingleRecipeInput input, Level level) {
@@ -102,7 +108,9 @@ public record KilnRecipe(
             Codec.intRange(1, Integer.MAX_VALUE).optionalFieldOf("cookingtime", DEFAULT_COOKING_TIME)
                 .forGetter(KilnRecipe::cookingTime),
             Codec.intRange(TIER_CLAY, Integer.MAX_VALUE).optionalFieldOf("tier", TIER_CLAY)
-                .forGetter(KilnRecipe::minTier)
+                .forGetter(KilnRecipe::minTier),
+            Codec.intRange(0, 2000).optionalFieldOf("heat", DEFAULT_REQUIRED_HEAT)
+                .forGetter(KilnRecipe::requiredHeat)
         ).apply(instance, KilnRecipe::new));
 
         private static final StreamCodec<RegistryFriendlyByteBuf, KilnRecipe> STREAM_CODEC =
@@ -112,6 +120,7 @@ public record KilnRecipe(
                 ByteBufCodecs.FLOAT, KilnRecipe::experience,
                 ByteBufCodecs.VAR_INT, KilnRecipe::cookingTime,
                 ByteBufCodecs.VAR_INT, KilnRecipe::minTier,
+                ByteBufCodecs.VAR_INT, KilnRecipe::requiredHeat,
                 KilnRecipe::new);
 
         @Override

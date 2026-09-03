@@ -113,9 +113,19 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     /** Packed positions of wall cells currently raw; memory-side, rebuilt on every form. */
     private final LongOpenHashSet rawWalls = new LongOpenHashSet();
 
-    /** Weather sampled at most twice a second: {@code isRainingAt} walks the heightmap. */
-    private boolean rainingCache;
-    private long rainingSampledAt = Long.MIN_VALUE;
+    /** Weather sampled at most once a second across exposed blocks. */
+    private float rainExposureRatio = 0.0F;
+    private long rainSampledAt = Long.MIN_VALUE;
+
+    /** Cached exposed wall blocks bordering exterior air/world (for water contact checks). */
+    private final List<BlockPos> exteriorWallBlocks = new java.util.ArrayList<>();
+
+    /** Cached top-facing blocks open to the sky (for rain exposure checks). */
+    private final List<BlockPos> skyExposedBlocks = new java.util.ArrayList<>();
+
+    /** Timestamps for throttling audio cues so they remain gentle and pleasant. */
+    private long lastQuenchSoundAt = Long.MIN_VALUE;
+    private long lastRainSoundAt = Long.MIN_VALUE;
 
     /**
      * Cached heat ceiling; {@code -1} means "recompute from the shell census". The ceiling only
@@ -161,6 +171,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private int litTime;
     private int litDuration;
     private int cookProgress;
+    private float cookProgressFraction;
     private int cookDuration = KilnRecipe.DEFAULT_COOKING_TIME;
     private int heat;
     private float storedExperience;
@@ -437,8 +448,31 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         // zero by construction and needs no stored entry.
         rawWalls.clear();
         soakStarts.clear();
+        exteriorWallBlocks.clear();
+        skyExposedBlocks.clear();
         if (level != null && !level.isClientSide) {
+            exteriorWallBlocks.add(worldPosition.immutable());
+            if (!instance.walls().contains(worldPosition.above()) && !instance.cavity().contains(worldPosition.above())) {
+                skyExposedBlocks.add(worldPosition.immutable());
+            }
+
             for (BlockPos pos : instance.walls()) {
+                if (!instance.walls().contains(pos.above()) && !instance.cavity().contains(pos.above())) {
+                    skyExposedBlocks.add(pos.immutable());
+                }
+
+                boolean isExterior = false;
+                for (Direction dir : Direction.values()) {
+                    BlockPos neighbor = pos.relative(dir);
+                    if (!instance.walls().contains(neighbor) && !instance.cavity().contains(neighbor)) {
+                        isExterior = true;
+                        break;
+                    }
+                }
+                if (isExterior) {
+                    exteriorWallBlocks.add(pos.immutable());
+                }
+
                 if (pos.equals(worldPosition)) {
                     continue;
                 }
@@ -468,6 +502,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         // Loaded with the shell already breached: fuel and progress in the save belonged to a
         // machine that no longer exists by the time this session starts.
         purgeOperationalState();
+        heat = 0;
         clearLitVisual();
     }
 
@@ -475,15 +510,110 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         litTime = 0;
         litDuration = 0;
         cookProgress = 0;
-        heat = 0;
+        cookProgressFraction = 0.0F;
+        // Do not zero heat here: let heat dissipate smoothly or be quenched by water/rain.
         activeJobKey = null;
         rawWalls.clear();
         soakStarts.clear();
+        exteriorWallBlocks.clear();
+        skyExposedBlocks.clear();
         extraChimneyHeight = 0;
         chimneyChoked = false;
         draftSampledAt = Long.MIN_VALUE;
+        rainSampledAt = Long.MIN_VALUE;
+        rainExposureRatio = 0.0F;
         status = KilnStatus.INCOMPLETE;
         invalidateCeiling();
+    }
+
+    /**
+     * Immediate push notification from a part block or port block when water touches it.
+     */
+    public void notifyWaterContact(BlockPos waterPos) {
+        floodCheckQueued = true;
+        if (level instanceof ServerLevel serverLevel && (isLit() || heat > 0 || soak > 0)) {
+            quenchAt(serverLevel, waterPos, false);
+        }
+    }
+
+    /**
+     * Spawns non-campfire steam/smoke particles and plays a gentle hissing sound,
+     * scaled dynamically in volume, pitch, and particle count by the kiln's temperature.
+     */
+    private void quenchAt(ServerLevel level, BlockPos contactPos, boolean internal) {
+        float heatRatio = Math.max(0.1F, (float) heat / MAX_HEAT);
+
+        long now = level.getGameTime();
+        if (now - lastQuenchSoundAt >= 25) {
+            lastQuenchSoundAt = now;
+            // Hotter kilns hiss with greater volume and higher steam pitch
+            float candleVol = 0.25F + 0.30F * heatRatio;
+            float sizzleVol = 0.12F + 0.23F * heatRatio;
+            float pitch = 1.35F + 0.35F * heatRatio + level.random.nextFloat() * 0.15F;
+
+            level.playSound(null, contactPos, SoundEvents.CANDLE_EXTINGUISH, SoundSource.BLOCKS,
+                candleVol, pitch * 0.85F);
+            level.playSound(null, contactPos, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS,
+                sizzleVol, pitch);
+        }
+
+        // Particle counts scale up with temperature: barely warm gives a small puff, incandescent produces thick steam
+        int smokeCount = Math.max(2, Math.round((internal ? 14 : 8) * heatRatio));
+        int largeSmokeCount = heat >= 350 ? Math.max(1, Math.round((internal ? 4 : 2) * heatRatio)) : 0;
+        int poofCount = Math.max(1, Math.round((internal ? 3 : 2) * heatRatio));
+
+        double spread = 0.15 + 0.15 * heatRatio;
+        double speed = 0.015 + 0.035 * heatRatio;
+
+        level.sendParticles(ParticleTypes.SMOKE,
+            contactPos.getX() + 0.5, contactPos.getY() + 0.5, contactPos.getZ() + 0.5,
+            smokeCount, spread, spread, spread, speed);
+        if (largeSmokeCount > 0) {
+            level.sendParticles(ParticleTypes.LARGE_SMOKE,
+                contactPos.getX() + 0.5, contactPos.getY() + 0.5, contactPos.getZ() + 0.5,
+                largeSmokeCount, spread * 0.8, spread * 0.8, spread * 0.8, speed * 0.8);
+        }
+        level.sendParticles(ParticleTypes.POOF,
+            contactPos.getX() + 0.5, contactPos.getY() + 0.5, contactPos.getZ() + 0.5,
+            poofCount, spread * 0.8, spread * 0.8, spread * 0.8, speed * 0.7);
+    }
+
+    private void playRainSizzle(ServerLevel level, BlockPos pos) {
+        long now = level.getGameTime();
+        if (now - lastRainSoundAt >= 40) {
+            lastRainSoundAt = now;
+            float heatRatio = Math.max(0.1F, (float) heat / MAX_HEAT);
+            float candleVol = 0.10F + 0.18F * heatRatio;
+            float sizzleVol = 0.05F + 0.12F * heatRatio;
+            float pitch = 1.6F + 0.3F * heatRatio + level.random.nextFloat() * 0.15F;
+
+            level.playSound(null, pos, SoundEvents.CANDLE_EXTINGUISH, SoundSource.BLOCKS,
+                candleVol, pitch * 0.85F);
+            level.playSound(null, pos, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS,
+                sizzleVol, pitch);
+        }
+    }
+
+    private float updateRainExposure(Level level) {
+        long now = level.getGameTime();
+        if (rainSampledAt != Long.MIN_VALUE && now - rainSampledAt < 20) {
+            return rainExposureRatio;
+        }
+        rainSampledAt = now;
+
+        if (!level.isRaining() || skyExposedBlocks.isEmpty()) {
+            rainExposureRatio = 0.0F;
+            return 0.0F;
+        }
+
+        int exposedCount = 0;
+        for (BlockPos skyPos : skyExposedBlocks) {
+            if (level.isRainingAt(skyPos.above())) {
+                exposedCount++;
+            }
+        }
+        rainExposureRatio = (float) exposedCount / skyExposedBlocks.size();
+        return rainExposureRatio;
     }
 
     private void clearLitVisual() {
@@ -528,37 +658,143 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         boolean operational = kiln.revalidateIfStale();
         MultiblockInstance instance = operational ? kiln.instance() : null;
 
-        // Water check: water flowing into the cavity instantly puts out fire and quenches heat
-        // Water check: pushed by neighbour changes and re-verified on a slow cadence, instead of
-        // scanning all twenty cavity cells every single tick.
-        if (operational && instance != null
-            && (kiln.floodCheckQueued || level.getGameTime() % 40 == 0)) {
-            kiln.floodCheckQueued = false;
-            boolean flooded = false;
-            for (BlockPos cavityPos : instance.cavity()) {
-                if (level.getFluidState(cavityPos).is(FluidTags.WATER)) {
-                    flooded = true;
-                    break;
+        // Water & Rain checks: flowing water and rain actively cool the kiln and its bricks
+        if (operational && instance != null) {
+            boolean isHot = kiln.isLit() || kiln.heat > 0 || (!kiln.rawWalls.isEmpty() && kiln.soak > 0);
+
+            // Water check: cavity flooding or water poured/flowing against walls
+            if (isHot && (kiln.floodCheckQueued || level.getGameTime() % 10 == 0)) {
+                kiln.floodCheckQueued = false;
+                boolean flooded = false;
+                BlockPos floodPos = null;
+
+                for (BlockPos cavityPos : instance.cavity()) {
+                    if (level.getFluidState(cavityPos).is(FluidTags.WATER)) {
+                        flooded = true;
+                        floodPos = cavityPos;
+                        break;
+                    }
+                }
+
+                // Also check if water is flowing into flue opening
+                if (!flooded) {
+                    Direction facing = kiln.controllerFacing(state);
+                    if (facing != null) {
+                        BlockPos flue = kiln.pattern().toWorld(pos, facing, ClayKilnPortBlock.FLUE_TOP);
+                        BlockPos chimneyTop = flue.above(kiln.extraChimneyHeight);
+                        if (level.getFluidState(chimneyTop.above()).is(FluidTags.WATER)
+                            || level.getFluidState(chimneyTop).is(FluidTags.WATER)) {
+                            flooded = true;
+                            floodPos = chimneyTop;
+                        }
+                    }
+                }
+
+                if (flooded) {
+                    if (level instanceof ServerLevel serverLevel) {
+                        kiln.quenchAt(serverLevel, floodPos != null ? floodPos : pos, true);
+                    }
+                    kiln.litTime = 0;
+                    kiln.heat = Math.max(0, kiln.heat - 60);
+                    kiln.soak = Math.max(0.0F, kiln.soak - 8.0F);
+                    dirty = true;
+                }
+
+                // Check exterior walls touched by water
+                int waterTouchingBricks = 0;
+                BlockPos waterContactPos = null;
+                for (BlockPos wallPos : kiln.exteriorWallBlocks) {
+                    for (Direction dir : Direction.values()) {
+                        BlockPos adj = wallPos.relative(dir);
+                        if (!instance.walls().contains(adj) && !instance.cavity().contains(adj)) {
+                            if (level.getFluidState(adj).is(FluidTags.WATER)) {
+                                waterTouchingBricks++;
+                                waterContactPos = adj;
+                                long packed = wallPos.asLong();
+                                if (kiln.rawWalls.contains(packed)) {
+                                    kiln.soakStarts.put(packed, Math.min(Integer.MAX_VALUE, (int) kiln.soak));
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (waterTouchingBricks > 0) {
+                    if (level instanceof ServerLevel serverLevel && waterContactPos != null) {
+                        kiln.quenchAt(serverLevel, waterContactPos, false);
+                    }
+                    int cooling = Math.min(kiln.heat, 15 + 5 * Math.min(waterTouchingBricks, 5));
+                    kiln.heat = Math.max(0, kiln.heat - cooling);
+                    kiln.soak = Math.max(0.0F, kiln.soak - 3.0F * Math.min(waterTouchingBricks, 3));
+                    dirty = true;
                 }
             }
-            if (flooded && (kiln.isLit() || kiln.heat > 0)) {
-                if (level instanceof ServerLevel serverLevel) {
-                    serverLevel.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
-                        pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5,
-                        10, 0.4, 0.4, 0.4, 0.05);
-                    serverLevel.playSound(null, pos, SoundEvents.FIRE_EXTINGUISH, SoundSource.BLOCKS, 0.8F, 0.9F);
+
+            // Rain exposure: downpours actively cool down unshielded hot kilns
+            float rainRatio = kiln.updateRainExposure(level);
+            if (rainRatio > 0.0F && kiln.heat > 0) {
+                int rainCool = Math.round(2.0F * rainRatio);
+                if (rainCool > 0) {
+                    kiln.heat = Math.max(0, kiln.heat - rainCool);
+                    dirty = true;
                 }
-                kiln.litTime = 0;
-                kiln.heat = Math.max(0, kiln.heat - 50);
-                dirty = true;
+                if (level instanceof ServerLevel serverLevel) {
+                    float heatFraction = (float) kiln.heat / MAX_HEAT;
+                    int particleInterval = kiln.heat >= 650 ? 4 : (kiln.heat >= 250 ? 8 : 14);
+                    if (level.getGameTime() % particleInterval == 0 && !kiln.skyExposedBlocks.isEmpty()) {
+                        BlockPos randomExposed = kiln.skyExposedBlocks.get(level.random.nextInt(kiln.skyExposedBlocks.size()));
+                        if (level.isRainingAt(randomExposed.above())) {
+                            int smokeCount = kiln.heat >= 650 ? 3 : (kiln.heat >= 250 ? 2 : 1);
+                            double spread = 0.10 + 0.12 * heatFraction;
+                            double speed = 0.01 + 0.025 * heatFraction;
+                            serverLevel.sendParticles(ParticleTypes.SMOKE,
+                                randomExposed.getX() + 0.5, randomExposed.getY() + 1.05, randomExposed.getZ() + 0.5,
+                                smokeCount, spread, 0.05, spread, speed);
+                            if (kiln.heat >= 500) {
+                                serverLevel.sendParticles(ParticleTypes.POOF,
+                                    randomExposed.getX() + 0.5, randomExposed.getY() + 1.05, randomExposed.getZ() + 0.5,
+                                    1, spread, 0.05, spread, speed);
+                            }
+                        }
+                    }
+                    int soundInterval = kiln.heat >= 750 ? 25 : (kiln.heat >= 350 ? 40 : 60);
+                    if (kiln.heat >= 100 && level.random.nextInt(soundInterval) == 0) {
+                        kiln.playRainSizzle(serverLevel, pos);
+                    }
+                }
             }
         }
 
         if (!operational) {
             kiln.status = KilnStatus.INCOMPLETE;
             if (kiln.heat > 0) {
-                // Smooth cooling over ~50 seconds when structure is broken
-                kiln.heat = Math.max(0, kiln.heat - 1);
+                int coolRate = 1;
+                if (level.isRainingAt(pos.above())) {
+                    coolRate += 2;
+                    if (level instanceof ServerLevel serverLevel) {
+                        float heatFraction = (float) kiln.heat / MAX_HEAT;
+                        int interval = kiln.heat >= 500 ? 5 : 10;
+                        if (level.getGameTime() % interval == 0) {
+                            serverLevel.sendParticles(ParticleTypes.SMOKE,
+                                pos.getX() + 0.5, pos.getY() + 1.05, pos.getZ() + 0.5,
+                                kiln.heat >= 500 ? 2 : 1, 0.15, 0.05, 0.15, 0.01 + 0.02 * heatFraction);
+                        }
+                        if (level.random.nextInt(kiln.heat >= 500 ? 30 : 50) == 0) {
+                            kiln.playRainSizzle(serverLevel, pos);
+                        }
+                    }
+                }
+                for (Direction dir : Direction.values()) {
+                    if (level.getFluidState(pos.relative(dir)).is(FluidTags.WATER)) {
+                        coolRate += 20;
+                        if (level instanceof ServerLevel serverLevel) {
+                            kiln.quenchAt(serverLevel, pos.relative(dir), false);
+                        }
+                        break;
+                    }
+                }
+                kiln.heat = Math.max(0, kiln.heat - coolRate);
                 dirty = true;
             }
         } else {
@@ -594,7 +830,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                     double mouthX = pos.getX() + 0.5 + facing.getStepX() * 0.52;
                     double mouthY = pos.getY() + 0.4;
                     double mouthZ = pos.getZ() + 0.5 + facing.getStepZ() * 0.52;
-                    serverLevel.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
+                    serverLevel.sendParticles(ParticleTypes.LARGE_SMOKE,
                         mouthX, mouthY, mouthZ, 2,
                         facing.getStepX() * 0.05, 0.04, facing.getStepZ() * 0.05, 0.01);
                 }
@@ -662,6 +898,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             // Progress belongs to a recipe, not merely to whatever happens to occupy the input
             // slot. Otherwise a slow recipe can be swapped for a fast one just before completion.
             cookProgress = 0;
+            cookProgressFraction = 0.0F;
             dirty = true;
         }
         activeJobKey = job.key();
@@ -682,10 +919,38 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             return coolProgress() || dirty;
         }
 
-        status = chimneyChoked ? KilnStatus.CHOKED : KilnStatus.WORKING;
-        cookProgress++;
+        // Temperature-driven smelting mechanics
+        int reqHeat = Math.max(1, job.requiredHeat());
+        float heatRatio = (float) heat / reqHeat;
+
+        if (heatRatio < 0.40F) {
+            status = KilnStatus.TOO_COLD;
+            return coolProgress() || dirty;
+        }
+
+        float speed;
+        if (heatRatio < 1.0F) {
+            // Warm-up zone: 40% to 100% heat smelts at 20% to 50% speed
+            float warmFraction = (heatRatio - 0.40F) / 0.60F;
+            speed = 0.20F + 0.30F * warmFraction;
+            status = chimneyChoked ? KilnStatus.CHOKED : KilnStatus.WARMING_UP;
+        } else {
+            // Optimal heat: 100% normal smelting speed
+            speed = 1.0F;
+            status = chimneyChoked ? KilnStatus.CHOKED : KilnStatus.WORKING;
+        }
+
+        cookProgressFraction += speed;
+        int wholeTicks = (int) cookProgressFraction;
+        if (wholeTicks > 0) {
+            cookProgress += wholeTicks;
+            cookProgressFraction -= wholeTicks;
+            dirty = true;
+        }
+
         if (cookProgress >= cookDuration) {
             cookProgress = 0;
+            cookProgressFraction = 0.0F;
             finish(level, job);
             return true;
         }
@@ -696,35 +961,23 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private boolean coolProgress() {
         if (cookProgress <= 0) {
             activeJobKey = null;
+            cookProgressFraction = 0.0F;
             return false;
         }
         cookProgress = Math.max(0, cookProgress - 2);
         if (cookProgress == 0) {
             activeJobKey = null;
+            cookProgressFraction = 0.0F;
         }
         return true;
-    }
-
-    /**
-     * Weather is global and changes rarely; one sample every two seconds replaces a heightmap
-     * walk per pending brick per tick during the whole curing window.
-     */
-    private boolean sampledRaining(Level level) {
-        long now = level.getGameTime();
-        if (rainingSampledAt > now || now - rainingSampledAt >= 40) {
-            rainingSampledAt = now;
-            rainingCache = level.isRainingAt(worldPosition.above());
-        }
-        return rainingCache;
     }
 
     /**
      * Thermal soak, one tick of fire at a time.
      *
      * <p>Bricks cure across their thermal exposure zones (~155-210 s) measured from when they
-     * entered a hot shell, not from a shared counter — so replacing one damaged brick re-soaks
-     * only that brick, and nothing ever resets anybody else's progress. Rain thins the flame to
-     * roughly three quarters, the same trade the old ×1.30 threshold made.</p>
+     * entered a hot shell, not from a shared counter. Rain falling on exposed bricks chills them,
+     * slowing curing down dramatically and even reversing progress if the kiln is cold.</p>
      *
      * <p>Steady-state cost is O(pending bricks) over pure memory; no block reads happen unless
      * something is actually due to convert.</p>
@@ -734,12 +987,16 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             return false;
         }
 
-        boolean raining = sampledRaining(level);
-        soak += raining ? 0.77F : 1.0F;
-        if (raining && level.random.nextInt(40) == 0 && level instanceof ServerLevel serverLevel) {
-            serverLevel.sendParticles(ParticleTypes.SMOKE,
-                worldPosition.getX() + 0.5, worldPosition.getY() + 1.2, worldPosition.getZ() + 0.5,
-                1, 0.3, 0.1, 0.3, 0.01);
+        float rainRatio = updateRainExposure(level);
+        if (rainRatio > 0.0F) {
+            // Cold rain chills the soaking bricks; low heat causes net cooling
+            if (heat < 250) {
+                soak = Math.max(0.0F, soak - 0.3F * rainRatio);
+            } else {
+                soak += Math.max(0.1F, 1.0F - rainRatio * 0.8F);
+            }
+        } else {
+            soak += 1.0F;
         }
 
         boolean changed = false;
@@ -831,9 +1088,15 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             );
             serverLevel.playSound(
                 null, pos,
+                SoundEvents.CANDLE_EXTINGUISH,
+                SoundSource.BLOCKS,
+                0.4F, 1.2F
+            );
+            serverLevel.playSound(
+                null, pos,
                 SoundEvents.FIRE_EXTINGUISH,
                 SoundSource.BLOCKS,
-                0.3F, 1.4F + serverLevel.random.nextFloat() * 0.4F
+                0.2F, 1.6F + serverLevel.random.nextFloat() * 0.2F
             );
         }
     }
@@ -946,7 +1209,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             RecipeHolder<KilnRecipe> holder = kilnMatch.get();
             KilnRecipe recipe = holder.value();
             return new Job("kiln:" + holder.id(), recipe.assemble(recipeInput, level.registryAccess()),
-                recipe.cookingTime(), recipe.experience(), recipe.minTier());
+                recipe.cookingTime(), recipe.experience(), recipe.minTier(), recipe.requiredHeat());
         }
 
         Optional<RecipeHolder<SmeltingRecipe>> furnaceMatch = furnaceRecipes.getRecipeFor(recipeInput, level);
@@ -954,11 +1217,77 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             RecipeHolder<SmeltingRecipe> holder = furnaceMatch.get();
             SmeltingRecipe recipe = holder.value();
             int time = scaledFurnaceCookingTime(recipe.getCookingTime());
-            return new Job("smelting:" + holder.id(), recipe.assemble(recipeInput, level.registryAccess()),
-                time, recipe.getExperience(), 0);
+            ItemStack result = recipe.assemble(recipeInput, level.registryAccess());
+            int heatReq = resolveRequiredHeat(input, result);
+            return new Job("smelting:" + holder.id(), result,
+                time, recipe.getExperience(), 0, heatReq);
         }
 
         return null;
+    }
+
+    /**
+     * Maps vanilla and modded items to their realistic, balanced smelting temperatures in kiln heat units (0 - 1200°C).
+     */
+    public static int resolveRequiredHeat(ItemStack input, ItemStack result) {
+        // 1. Food: meats, fish, potatoes, kelp, etc. (150°C)
+        if (input.has(net.minecraft.core.component.DataComponents.FOOD)
+            || result.has(net.minecraft.core.component.DataComponents.FOOD)) {
+            return 150;
+        }
+
+        // 2. Wood / Pyrolysis to Charcoal (250°C)
+        if (result.is(net.minecraft.world.item.Items.CHARCOAL)
+            || input.is(net.minecraft.tags.ItemTags.LOGS)) {
+            return 250;
+        }
+
+        // 3. Copper: melts at 1085°C (1000°C in kiln)
+        if (input.is(net.minecraft.world.item.Items.RAW_COPPER)
+            || result.is(net.minecraft.world.item.Items.COPPER_INGOT)
+            || input.is(net.minecraft.tags.ItemTags.COPPER_ORES)) {
+            return 1000;
+        }
+
+        // 4. Gold: melts at 1064°C (950°C in kiln)
+        if (input.is(net.minecraft.world.item.Items.RAW_GOLD)
+            || result.is(net.minecraft.world.item.Items.GOLD_INGOT)
+            || input.is(net.minecraft.tags.ItemTags.GOLD_ORES)) {
+            return 950;
+        }
+
+        // 5. Iron: requires bloomery reduction 1150-1250°C (1100°C in kiln, needs blast fan)
+        if (input.is(net.minecraft.world.item.Items.RAW_IRON)
+            || result.is(net.minecraft.world.item.Items.IRON_INGOT)
+            || input.is(net.minecraft.tags.ItemTags.IRON_ORES)) {
+            return 1100;
+        }
+
+        // 6. Glass from sand (750°C)
+        if (input.is(net.minecraft.world.item.Items.SAND)
+            || input.is(net.minecraft.world.item.Items.RED_SAND)
+            || result.is(net.minecraft.world.item.Items.GLASS)) {
+            return 750;
+        }
+
+        // 7. Stone & stone bricks sintering (650°C)
+        if (input.is(net.minecraft.world.item.Items.COBBLESTONE)
+            || input.is(net.minecraft.world.item.Items.COBBLED_DEEPSLATE)
+            || input.is(net.minecraft.world.item.Items.STONE_BRICKS)
+            || input.is(net.minecraft.world.item.Items.STONE)
+            || input.is(net.minecraft.world.item.Items.BASALT)) {
+            return 650;
+        }
+
+        // 8. Clay, Terracotta, Bricks (600°C)
+        if (input.is(net.minecraft.world.item.Items.CLAY_BALL)
+            || input.is(net.minecraft.world.item.Items.CLAY)
+            || result.is(net.minecraft.world.item.Items.BRICK)
+            || result.is(net.minecraft.world.item.Items.TERRACOTTA)) {
+            return 600;
+        }
+
+        return 600;
     }
 
     /**
@@ -989,7 +1318,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     }
 
     /** One unit of work the kiln has agreed to do, flattened out of whichever recipe described it. */
-    private record Job(String key, ItemStack result, int cookingTime, float experience, int minTier) {
+    private record Job(String key, ItemStack result, int cookingTime, float experience, int minTier, int requiredHeat) {
         boolean isAllowedIn(int tier) {
             return tier >= minTier;
         }

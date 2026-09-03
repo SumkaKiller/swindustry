@@ -232,6 +232,14 @@ tasks.register('structurePatternChecks', JavaExec) {
     dependsOn checksClasses
 }
 
+tasks.register('kilnWaterCoolingChecks', JavaExec) {
+    group = 'verification'
+    description = 'Verifies water cooling, rain exposure, and sound/particle invariants for clay kiln.'
+    classpath = sourceSets.checks.runtimeClasspath
+    mainClass = 'com.jokerdayn.swindustry.checks.KilnWaterCoolingCheck'
+    dependsOn checksClasses
+}
+
 tasks.named('check').configure {
-    dependsOn 'multiblockChecks', 'campfireChecks', 'guiTextureChecks', 'stage1ProgressionChecks', 'structurePatternChecks'
+    dependsOn 'multiblockChecks', 'campfireChecks', 'guiTextureChecks', 'stage1ProgressionChecks', 'structurePatternChecks', 'kilnWaterCoolingChecks'
 }

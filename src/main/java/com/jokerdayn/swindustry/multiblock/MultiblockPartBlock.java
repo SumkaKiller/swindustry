@@ -32,8 +32,8 @@ public class MultiblockPartBlock extends Block {
     @Override
     protected void neighborChanged(BlockState state, Level level, BlockPos pos, Block neighborBlock,
                                    BlockPos fromPos, boolean isMoving) {
-        // A change beside one of our walls may have flooded or obstructed the interior; push the
-        // news instead of letting machines poll their cavities every tick.
-        MultiblockPatterns.notifyNeighborChanged(level, fromPos);
+        // A change beside one of our walls may have flooded or obstructed the interior,
+        // or water may have touched this brick block directly.
+        MultiblockPatterns.notifyNeighborChanged(level, pos, fromPos);
     }
 }

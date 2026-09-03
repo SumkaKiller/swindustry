@@ -86,16 +86,32 @@ public final class MultiblockPatterns {
 
     /**
      * Push hook from part blocks' {@code neighborChanged}: something changed at {@code changedPos},
-     * which may be one of our interior cells — most importantly, fluid may have entered.
+     * beside part block {@code partPos}.
      */
-    public static void notifyNeighborChanged(Level level, BlockPos changedPos) {
+    public static void notifyNeighborChanged(Level level, BlockPos partPos, BlockPos changedPos) {
         if (level.isClientSide) {
             return;
         }
-        MultiblockControllerEntity owner = CAVITY_OWNERS.get(changedPos.asLong());
-        if (owner != null && !owner.isRemoved() && owner.getLevel() == level) {
-            owner.invalidateStructure();
+        MultiblockControllerEntity cavityOwner = CAVITY_OWNERS.get(changedPos.asLong());
+        if (cavityOwner != null && !cavityOwner.isRemoved() && cavityOwner.getLevel() == level) {
+            cavityOwner.invalidateStructure();
         }
+
+        MultiblockControllerEntity partOwner = OWNERSHIP.get(partPos.asLong());
+        if (partOwner != null && !partOwner.isRemoved() && partOwner.getLevel() == level) {
+            if (level.getFluidState(changedPos).is(net.minecraft.tags.FluidTags.WATER)) {
+                if (partOwner instanceof com.jokerdayn.swindustry.kiln.ClayKilnBlockEntity kiln) {
+                    kiln.notifyWaterContact(changedPos);
+                }
+            }
+        }
+    }
+
+    /**
+     * Backwards-compatible hook when only changedPos is known.
+     */
+    public static void notifyNeighborChanged(Level level, BlockPos changedPos) {
+        notifyNeighborChanged(level, changedPos, changedPos);
     }
 
     /**
