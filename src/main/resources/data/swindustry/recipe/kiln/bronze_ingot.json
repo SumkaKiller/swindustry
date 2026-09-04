@@ -10,6 +10,7 @@
   "experience": 0.7,
   "cookingtime": 220,
   "tier": 1,
+  "heat": 900,
   "neoforge:conditions": [
     {
       "type": "neoforge:mod_loaded",

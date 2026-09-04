@@ -48,7 +48,7 @@ public record KilnRecipe(
     public static final int TIER_CLAY = 1;
 
     public static final int DEFAULT_COOKING_TIME = 200;
-    public static final int DEFAULT_REQUIRED_HEAT = 850;
+    public static final int DEFAULT_REQUIRED_HEAT = 900;
 
     public KilnRecipe(Ingredient ingredient, ItemStack result, float experience, int cookingTime, int minTier) {
         this(ingredient, result, experience, cookingTime, minTier, DEFAULT_REQUIRED_HEAT);

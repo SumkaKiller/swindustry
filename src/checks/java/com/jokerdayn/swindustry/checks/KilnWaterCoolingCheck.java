@@ -52,11 +52,11 @@ public final class KilnWaterCoolingCheck {
         assertHeat(net.minecraft.world.item.Items.BEEF, net.minecraft.world.item.Items.COOKED_BEEF, 150, "Beef");
         assertHeat(net.minecraft.world.item.Items.OAK_LOG, net.minecraft.world.item.Items.CHARCOAL, 250, "Charcoal");
         assertHeat(net.minecraft.world.item.Items.CLAY_BALL, net.minecraft.world.item.Items.BRICK, 600, "Brick");
-        assertHeat(net.minecraft.world.item.Items.COBBLESTONE, net.minecraft.world.item.Items.STONE, 650, "Stone");
+        assertHeat(net.minecraft.world.item.Items.COBBLESTONE, net.minecraft.world.item.Items.STONE, 600, "Stone");
         assertHeat(net.minecraft.world.item.Items.SAND, net.minecraft.world.item.Items.GLASS, 750, "Glass");
-        assertHeat(net.minecraft.world.item.Items.RAW_GOLD, net.minecraft.world.item.Items.GOLD_INGOT, 950, "Gold");
-        assertHeat(net.minecraft.world.item.Items.RAW_COPPER, net.minecraft.world.item.Items.COPPER_INGOT, 1000, "Copper");
-        assertHeat(net.minecraft.world.item.Items.RAW_IRON, net.minecraft.world.item.Items.IRON_INGOT, 1100, "Iron");
+        assertHeat(net.minecraft.world.item.Items.RAW_GOLD, net.minecraft.world.item.Items.GOLD_INGOT, 800, "Gold");
+        assertHeat(net.minecraft.world.item.Items.RAW_COPPER, net.minecraft.world.item.Items.COPPER_INGOT, 900, "Copper");
+        assertHeat(net.minecraft.world.item.Items.RAW_IRON, net.minecraft.world.item.Items.IRON_INGOT, 1000, "Iron");
     }
 
     private static void assertHeat(net.minecraft.world.item.Item input, net.minecraft.world.item.Item result,
