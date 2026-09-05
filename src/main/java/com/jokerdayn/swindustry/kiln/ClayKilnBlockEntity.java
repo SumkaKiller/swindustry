@@ -107,7 +107,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
      */
     private float soak;
 
-    /** Repair bricks only: packed position -> soak when inserted. The initial batch needs none. */
+    /** Packed raw-wall position -> soak when that brick entered the current firing cycle. */
     private final Long2IntOpenHashMap soakStarts = new Long2IntOpenHashMap();
 
     /** Packed positions of wall cells currently raw; memory-side, rebuilt on every form. */
@@ -459,11 +459,13 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     protected void onFormed(com.jokerdayn.swindustry.multiblock.MultiblockInstance instance) {
         status = KilnStatus.IDLE;
 
-        // Rebuild raw-wall tracking from the actual world. Repair bricks inserted into an
-        // already-soaking shell start from today's soak value; the original batch starts at
-        // zero by construction and needs no stored entry.
+        // Rebuild raw-wall tracking from the actual world without resetting per-brick progress.
+        // The map is persisted, while rawWalls is deliberately transient, so a loaded kiln must
+        // keep entries restored by loadAdditional. A newly inserted brick has no entry and starts
+        // at the current soak value; the original batch is recorded explicitly with start 0 so
+        // that a later save/load can distinguish it from a newly inserted brick.
+        LongOpenHashSet previouslyTrackedRaw = new LongOpenHashSet(rawWalls);
         rawWalls.clear();
-        soakStarts.clear();
         exteriorWallBlocks.clear();
         skyExposedBlocks.clear();
         if (level != null && !level.isClientSide) {
@@ -498,12 +500,59 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 }
                 long packed = pos.asLong();
                 rawWalls.add(packed);
-                if (soak > 0) {
-                    soakStarts.put(packed, Math.min(Integer.MAX_VALUE, (int) soak));
+                if (!soakStarts.containsKey(packed)) {
+                    int start = previouslyTrackedRaw.contains(packed)
+                        ? 0
+                        : Math.min(Integer.MAX_VALUE, Math.max(0, (int) soak));
+                    soakStarts.put(packed, start);
                 }
             }
         }
         invalidateCeiling();
+    }
+
+    @Override
+    protected void onRevalidated(MultiblockInstance instance) {
+        if (reconcileRawWallTracking(instance)) {
+            invalidateCeiling();
+            setChanged();
+        }
+    }
+
+    /**
+     * Reconciles raw walls even when a replacement still matches the multiblock pattern. A cured
+     * wall can become raw without making the structure unformed, so transition callbacks alone are
+     * not enough to maintain curing state or the derived heat/tier caches.
+     */
+    private boolean reconcileRawWallTracking(
+        MultiblockInstance instance) {
+        if (level == null || level.isClientSide) {
+            return false;
+        }
+        LongOpenHashSet previouslyTrackedRaw = new LongOpenHashSet(rawWalls);
+        boolean changed = false;
+        for (BlockPos pos : instance.walls()) {
+            if (pos.equals(worldPosition)) {
+                continue;
+            }
+            long packed = pos.asLong();
+            if (level.getBlockState(pos).is(ModBlocks.RAW_CLAY_BRICKS.get())) {
+                if (rawWalls.add(packed)) {
+                    changed = true;
+                }
+                if (!soakStarts.containsKey(packed)) {
+                    int start = previouslyTrackedRaw.contains(packed)
+                        ? 0
+                        : Math.min(Integer.MAX_VALUE, Math.max(0, (int) soak));
+                    soakStarts.put(packed, start);
+                    changed = true;
+                }
+            } else if (rawWalls.remove(packed)) {
+                soakStarts.remove(packed);
+                changed = true;
+            }
+        }
+        return changed;
     }
 
     @Override
@@ -518,8 +567,20 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         // Loaded with the shell already breached: fuel and progress in the save belonged to a
         // machine that no longer exists by the time this session starts.
         purgeOperationalState();
+        rawWalls.clear();
+        soakStarts.clear();
         heat = 0;
         clearLitVisual();
+    }
+
+    /**
+     * Forgets curing progress when a tracked raw wall is replaced. Keeping this separate from
+     * structure invalidation lets unchanged walls retain their accumulated exposure after a repair.
+     */
+    public void forgetRawWall(BlockPos pos) {
+        long packed = pos.asLong();
+        rawWalls.remove(packed);
+        soakStarts.remove(packed);
     }
 
     private void purgeOperationalState() {
@@ -529,8 +590,6 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         cookProgressFraction = 0.0F;
         // Do not zero heat here: let heat dissipate smoothly or be quenched by water/rain.
         activeJobKey = null;
-        rawWalls.clear();
-        soakStarts.clear();
         exteriorWallBlocks.clear();
         skyExposedBlocks.clear();
         extraChimneyHeight = 0;
@@ -560,7 +619,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         float heatRatio = Math.max(0.1F, (float) heat / MAX_HEAT);
 
         long now = level.getGameTime();
-        if (now - lastQuenchSoundAt >= 8) {
+        if (lastQuenchSoundAt == Long.MIN_VALUE || lastQuenchSoundAt > now
+            || now - lastQuenchSoundAt >= 8) {
             lastQuenchSoundAt = now;
             // Hotter kilns hiss with greater volume and higher steam pitch
             float candleVol = 0.50F + 0.35F * heatRatio;
@@ -582,7 +642,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
 
     private void playRainSizzle(ServerLevel level, BlockPos pos) {
         long now = level.getGameTime();
-        if (now - lastRainSoundAt >= 8) {
+        if (lastRainSoundAt == Long.MIN_VALUE || lastRainSoundAt > now
+            || now - lastRainSoundAt >= 8) {
             lastRainSoundAt = now;
             float heatRatio = Math.max(0.1F, (float) heat / MAX_HEAT);
             float candleVol = 0.45F + 0.30F * heatRatio;

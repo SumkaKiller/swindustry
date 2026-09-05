@@ -125,6 +125,9 @@ public final class MultiblockPatterns {
         }
         MultiblockControllerEntity owner = OWNERSHIP.get(pos.asLong());
         if (owner != null && !owner.isRemoved() && owner.getLevel() == level) {
+            if (owner instanceof com.jokerdayn.swindustry.kiln.ClayKilnBlockEntity kiln) {
+                kiln.forgetRawWall(pos);
+            }
             owner.invalidateStructure();
         }
     }

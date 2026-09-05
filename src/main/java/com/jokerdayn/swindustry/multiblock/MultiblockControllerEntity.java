@@ -154,6 +154,8 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
         } else if (formed == null && previous != null) {
             onUnformed();
             setChanged();
+        } else if (formed != null) {
+            onRevalidated(formed);
         } else if (firstValidation && formed == null) {
             // Loaded into a conclusively broken structure: operational state that survived the
             // save belonged to a machine that no longer exists.
@@ -215,6 +217,9 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
 
     /** Called once when the machine goes from taken apart to assembled. */
     protected void onFormed(MultiblockInstance instance) {}
+
+    /** Called after a formed machine is successfully checked again. */
+    protected void onRevalidated(MultiblockInstance instance) {}
 
     /** Called once when the machine goes from assembled to taken apart. */
     protected void onUnformed() {}

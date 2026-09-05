@@ -29,7 +29,7 @@ public class PrimitiveCampfireBlockEntity extends BlockEntity {
     private int burnTicks;
     private final CampfireIgnition ignition = new CampfireIgnition();
 
-    /** Weather sampled at most twice a second; {@code isRainingAt} walks the heightmap. */
+    /** Weather sampled at most once every two seconds; {@code isRainingAt} walks the heightmap. */
     private boolean rainingCache;
     private long rainingSampledAt = Long.MIN_VALUE;
 
@@ -38,7 +38,8 @@ public class PrimitiveCampfireBlockEntity extends BlockEntity {
             return false;
         }
         long now = level.getGameTime();
-        if (rainingSampledAt > now || now - rainingSampledAt >= 40) {
+        if (rainingSampledAt == Long.MIN_VALUE || rainingSampledAt > now
+            || now - rainingSampledAt >= 40) {
             rainingSampledAt = now;
             rainingCache = level.isRainingAt(pos.above());
         }
