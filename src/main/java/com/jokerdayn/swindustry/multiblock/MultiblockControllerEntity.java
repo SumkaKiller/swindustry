@@ -130,17 +130,24 @@ public abstract class MultiblockControllerEntity extends BlockEntity {
                 return false;
             }
             next = result.instance().orElse(null);
+            if (previous != null && next != null && previous.equals(next)) {
+                // Pattern evaluation still verifies the world, but an unchanged machine does not
+                // need a new allocation or an ownership-index rewrite on every scheduled check.
+                next = previous;
+            }
         }
         validationDeferred = false;
         formed = next;
 
         // Ownership registry: written only from verified instances so break events stay a single
         // map hit, and released the moment the machine stops matching or is removed.
-        if (previous != null && previous != next) {
-            MultiblockPatterns.release(this, previous);
-        }
-        if (next != null) {
-            MultiblockPatterns.claim(this, next);
+        if (previous != next) {
+            if (previous != null) {
+                MultiblockPatterns.release(this, previous);
+            }
+            if (next != null) {
+                MultiblockPatterns.claim(this, next);
+            }
         }
 
         boolean firstValidation = !firstValidationDone;

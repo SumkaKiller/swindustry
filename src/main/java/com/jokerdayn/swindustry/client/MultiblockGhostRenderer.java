@@ -5,11 +5,14 @@ import com.jokerdayn.swindustry.item.PrimitiveEngineerGogglesItem;
 import com.jokerdayn.swindustry.multiblock.BlockMatcher;
 import com.jokerdayn.swindustry.multiblock.MultiblockControllerEntity;
 import com.jokerdayn.swindustry.multiblock.MultiblockPattern;
+import com.jokerdayn.swindustry.multiblock.network.KilnStructurePayload;
 import com.jokerdayn.swindustry.registry.ModBlocks;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
@@ -43,12 +46,21 @@ public final class MultiblockGhostRenderer {
 
     private static long lastScanTick = -1;
     private static final List<BlockPos> CACHED_CONTROLLER_POSITIONS = new ArrayList<>();
+    private static final Map<BlockPos, List<MultiblockPattern.InspectionCell>> LOCAL_INSPECTIONS = new HashMap<>();
+    private static final Map<BlockPos, CachedServerInspection> SERVER_INSPECTIONS = new HashMap<>();
+    private static ClientLevel cachedLevel;
+
+    private record CachedServerInspection(List<KilnStructurePayload.Cell> cells,
+                                          List<MultiblockPattern.InspectionCell> inspection) {}
 
     private MultiblockGhostRenderer() {}
 
     @SubscribeEvent
     public static void onClientLogout(net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut event) {
         CACHED_CONTROLLER_POSITIONS.clear();
+        LOCAL_INSPECTIONS.clear();
+        SERVER_INSPECTIONS.clear();
+        cachedLevel = null;
         lastScanTick = -1;
         StructureVerdicts.clear();
     }
@@ -87,19 +99,7 @@ public final class MultiblockGhostRenderer {
                 // Prefer the server's verdict; fall back to a local pattern walk only when no
                 // verdict has arrived yet (freshly placed controller, packet loss, singleplayer
                 // before first tick).
-                var cachedCells = StructureVerdicts.lookup(cPos);
-                List<MultiblockPattern.InspectionCell> inspection;
-                if (cachedCells != null) {
-                    inspection = new ArrayList<>(cachedCells.size());
-                    for (var c : cachedCells) {
-                        inspection.add(new MultiblockPattern.InspectionCell(
-                            net.minecraft.core.BlockPos.of(c.packed()), ' ',
-                            BlockMatcher.of(BlockMatcher.Role.values()[c.roleOrdinal()], s -> false),
-                            false));
-                    }
-                } else {
-                    inspection = controller.inspectStructure();
-                }
+                List<MultiblockPattern.InspectionCell> inspection = getInspection(level, cPos, controller);
                 for (MultiblockPattern.InspectionCell cell : inspection) {
                     if (!cell.matches()) {
                         BlockPos pos = cell.pos();
@@ -192,11 +192,46 @@ public final class MultiblockGhostRenderer {
     /**
      * Chunk-level block entity search: scans only loaded block entities instead of brute-forcing thousands of air blocks.
      */
+    private static List<MultiblockPattern.InspectionCell> getInspection(
+        ClientLevel level, BlockPos controllerPos, MultiblockControllerEntity controller) {
+        List<KilnStructurePayload.Cell> serverCells = StructureVerdicts.lookup(controllerPos);
+        if (serverCells != null) {
+            CachedServerInspection cached = SERVER_INSPECTIONS.get(controllerPos);
+            if (cached == null || cached.cells() != serverCells) {
+                List<MultiblockPattern.InspectionCell> inspection = new ArrayList<>(serverCells.size());
+                for (KilnStructurePayload.Cell cell : serverCells) {
+                    inspection.add(new MultiblockPattern.InspectionCell(
+                        BlockPos.of(cell.packed()), ' ',
+                        BlockMatcher.of(BlockMatcher.Role.values()[cell.roleOrdinal()], s -> false),
+                        false));
+                }
+                inspection = List.copyOf(inspection);
+                SERVER_INSPECTIONS.put(controllerPos,
+                    new CachedServerInspection(serverCells, inspection));
+                return inspection;
+            }
+            return cached.inspection();
+        }
+
+        SERVER_INSPECTIONS.remove(controllerPos);
+        return LOCAL_INSPECTIONS.computeIfAbsent(controllerPos,
+            ignored -> controller.inspectStructure());
+    }
+
     private static List<BlockPos> getNearbyControllers(ClientLevel level, BlockPos playerPos) {
+        if (cachedLevel != level) {
+            cachedLevel = level;
+            lastScanTick = -1;
+            CACHED_CONTROLLER_POSITIONS.clear();
+            LOCAL_INSPECTIONS.clear();
+            SERVER_INSPECTIONS.clear();
+        }
+
         long tick = level.getGameTime();
         if (tick - lastScanTick >= SCAN_INTERVAL_TICKS || tick < lastScanTick) {
             lastScanTick = tick;
             CACHED_CONTROLLER_POSITIONS.clear();
+            LOCAL_INSPECTIONS.clear();
 
             int minChunkX = (playerPos.getX() - HORIZONTAL_RADIUS) >> 4;
             int maxChunkX = (playerPos.getX() + HORIZONTAL_RADIUS) >> 4;
@@ -227,6 +262,8 @@ public final class MultiblockGhostRenderer {
                     }
                 }
             }
+            SERVER_INSPECTIONS.keySet().removeIf(
+                pos -> !CACHED_CONTROLLER_POSITIONS.contains(pos));
         }
         return CACHED_CONTROLLER_POSITIONS;
     }

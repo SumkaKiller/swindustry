@@ -308,6 +308,11 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         return extraChimneyHeight;
     }
 
+    @SuppressWarnings("deprecation")
+    private static boolean hasLoadedChunk(Level level, BlockPos pos) {
+        return level.hasChunkAt(pos);
+    }
+
     /**
      * Checks chimney ventilation and natural draft.
      * Evaluates up to 4 additional chimney courses above the base multiblock flue opening.
@@ -329,12 +334,18 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         }
 
         BlockPos flue = pattern().toWorld(worldPosition, facing, ClayKilnPortBlock.FLUE_TOP);
+        if (!hasLoadedChunk(level, flue)) {
+            return;
+        }
         BlockPos chimneyExit = flue;
         boolean choked = false;
         int extra = 0;
 
         for (int step = 1; step <= 4; step++) {
             BlockPos above = chimneyExit.above();
+            if (!hasLoadedChunk(level, above)) {
+                return;
+            }
             BlockState aboveState = level.getBlockState(above);
             if (!aboveState.isAir() && !aboveState.canBeReplaced()) {
                 choked = true;
@@ -344,6 +355,10 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             BlockPos south = above.south();
             BlockPos east = above.east();
             BlockPos west = above.west();
+            if (!hasLoadedChunk(level, north) || !hasLoadedChunk(level, south)
+                || !hasLoadedChunk(level, east) || !hasLoadedChunk(level, west)) {
+                return;
+            }
             if (level.getBlockState(north).is(ModTags.Blocks.KILN_WALL)
                 && level.getBlockState(south).is(ModTags.Blocks.KILN_WALL)
                 && level.getBlockState(east).is(ModTags.Blocks.KILN_WALL)
@@ -366,7 +381,11 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             }
         }
         if (!choked) {
-            BlockState exitAbove = level.getBlockState(chimneyExit.above());
+            BlockPos exitPos = chimneyExit.above();
+            if (!hasLoadedChunk(level, exitPos)) {
+                return;
+            }
+            BlockState exitAbove = level.getBlockState(exitPos);
             if (!exitAbove.isAir() && !exitAbove.canBeReplaced()) {
                 choked = true;
             }
@@ -671,7 +690,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
 
         int exposedCount = 0;
         for (BlockPos skyPos : skyExposedBlocks) {
-            if (level.isRainingAt(skyPos.above())) {
+            BlockPos rainPos = skyPos.above();
+            if (hasLoadedChunk(level, rainPos) && level.isRainingAt(rainPos)) {
                 exposedCount++;
             }
         }
@@ -732,7 +752,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 BlockPos floodPos = null;
 
                 for (BlockPos cavityPos : instance.cavity()) {
-                    if (level.getFluidState(cavityPos).is(FluidTags.WATER)) {
+                    if (hasLoadedChunk(level, cavityPos)
+                        && level.getFluidState(cavityPos).is(FluidTags.WATER)) {
                         flooded = true;
                         floodPos = cavityPos;
                         break;
@@ -745,8 +766,10 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                     if (facing != null) {
                         BlockPos flue = kiln.pattern().toWorld(pos, facing, ClayKilnPortBlock.FLUE_TOP);
                         BlockPos chimneyTop = flue.above(kiln.extraChimneyHeight);
-                        if (level.getFluidState(chimneyTop.above()).is(FluidTags.WATER)
-                            || level.getFluidState(chimneyTop).is(FluidTags.WATER)) {
+                        BlockPos chimneyAbove = chimneyTop.above();
+                        if (hasLoadedChunk(level, chimneyTop) && hasLoadedChunk(level, chimneyAbove)
+                            && (level.getFluidState(chimneyAbove).is(FluidTags.WATER)
+                            || level.getFluidState(chimneyTop).is(FluidTags.WATER))) {
                             flooded = true;
                             floodPos = chimneyTop;
                         }
@@ -770,7 +793,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                     for (Direction dir : Direction.values()) {
                         BlockPos adj = wallPos.relative(dir);
                         if (!instance.walls().contains(adj) && !instance.cavity().contains(adj)) {
-                            if (level.getFluidState(adj).is(FluidTags.WATER)) {
+                            if (hasLoadedChunk(level, adj)
+                                && level.getFluidState(adj).is(FluidTags.WATER)) {
                                 waterTouchingBricks++;
                                 waterContactPos = adj;
                                 long packed = wallPos.asLong();
@@ -843,10 +867,12 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                     }
                 }
                 for (Direction dir : Direction.values()) {
-                    if (level.getFluidState(pos.relative(dir)).is(FluidTags.WATER)) {
+                    BlockPos adjacent = pos.relative(dir);
+                    if (hasLoadedChunk(level, adjacent)
+                        && level.getFluidState(adjacent).is(FluidTags.WATER)) {
                         coolRate += 20;
                         if (level instanceof ServerLevel serverLevel) {
-                            kiln.quenchAt(serverLevel, pos.relative(dir), false);
+                            kiln.quenchAt(serverLevel, adjacent, false);
                         }
                         break;
                     }

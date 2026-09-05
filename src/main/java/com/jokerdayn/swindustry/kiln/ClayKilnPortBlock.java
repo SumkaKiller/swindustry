@@ -177,22 +177,37 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
 
         for (int step = 1; step <= 4; step++) {
             BlockPos above = chimneyExit.above();
+            if (!hasLoadedChunk(level, above)) {
+                return;
+            }
             BlockState aboveState = level.getBlockState(above);
             if (!aboveState.isAir() && !aboveState.canBeReplaced()) {
                 choked = true;
                 break;
             }
-            if (level.getBlockState(above.north()).is(ModTags.Blocks.KILN_WALL)
-                && level.getBlockState(above.south()).is(ModTags.Blocks.KILN_WALL)
-                && level.getBlockState(above.east()).is(ModTags.Blocks.KILN_WALL)
-                && level.getBlockState(above.west()).is(ModTags.Blocks.KILN_WALL)) {
+            BlockPos north = above.north();
+            BlockPos south = above.south();
+            BlockPos east = above.east();
+            BlockPos west = above.west();
+            if (!hasLoadedChunk(level, north) || !hasLoadedChunk(level, south)
+                || !hasLoadedChunk(level, east) || !hasLoadedChunk(level, west)) {
+                return;
+            }
+            if (level.getBlockState(north).is(ModTags.Blocks.KILN_WALL)
+                && level.getBlockState(south).is(ModTags.Blocks.KILN_WALL)
+                && level.getBlockState(east).is(ModTags.Blocks.KILN_WALL)
+                && level.getBlockState(west).is(ModTags.Blocks.KILN_WALL)) {
                 chimneyExit = above;
             } else {
                 break;
             }
         }
         if (!choked) {
-            BlockState exitAbove = level.getBlockState(chimneyExit.above());
+            BlockPos exitPos = chimneyExit.above();
+            if (!hasLoadedChunk(level, exitPos)) {
+                return;
+            }
+            BlockState exitAbove = level.getBlockState(exitPos);
             if (!exitAbove.isAir() && !exitAbove.canBeReplaced()) {
                 choked = true;
             }
@@ -213,6 +228,11 @@ public class ClayKilnPortBlock extends BaseEntityBlock {
 
     /** Where the flue opens, relative to the port, in the pattern's authored orientation. */
     public static final Vec3i FLUE_TOP = new Vec3i(0, 3, 2);
+
+    @SuppressWarnings("deprecation")
+    private static boolean hasLoadedChunk(Level level, BlockPos pos) {
+        return level.hasChunkAt(pos);
+    }
 
     // ------------------------------------------------------------------
 
