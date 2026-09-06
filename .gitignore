@@ -1,5 +1,6 @@
 ### Gradle ###
 .gradle
+.gradle-local/
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/**/build/
@@ -47,3 +48,6 @@ audit.txt
 kiln_todo.txt
 plan.txt
 bug_report.txt
+GAMEPLAY_IMPLEMENTATION_PLAN.txt
+GAME_DESIGN_MODULAR_FACTORIES.txt
+PROJECT_AUDIT_2026-09-05.txt

@@ -7,13 +7,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 
 /**
- * Standard 176x166 kiln screen featuring a vanilla furnace layout enhanced with a 4-stage color heat gauge.
+ * Standard 176x174 kiln screen featuring a vanilla furnace layout enhanced with a 4-stage color heat gauge.
  */
 public class ClayKilnScreen extends AbstractContainerScreen<ClayKilnMenu> {
 
@@ -47,17 +49,23 @@ public class ClayKilnScreen extends AbstractContainerScreen<ClayKilnMenu> {
     private static final int OUTPUT_X = 102;
     private static final int OUTPUT_Y = 35;
     private static final int SLOT_FRAME_SIZE = 18;
+    private static final int CURING_BUTTON_WIDTH = 72;
+    private static final int CURING_BUTTON_HEIGHT = 14;
+    // Center the control on the output slot, with four pixels before the heat gauge.
+    private static final int CURING_BUTTON_X = OUTPUT_X + 8 - CURING_BUTTON_WIDTH / 2;
+    private static final int CURING_BUTTON_Y = 60;
 
     private static final int LABEL_COLOR = 0x404040;
+    private Button curingButton;
 
     public ClayKilnScreen(ClayKilnMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         this.imageWidth = 176;
-        this.imageHeight = 166;
+        this.imageHeight = 174;
         this.titleLabelX = 8;
         this.titleLabelY = 6;
         this.inventoryLabelX = 8;
-        this.inventoryLabelY = 72;
+        this.inventoryLabelY = 80;
     }
 
     @Override
@@ -65,6 +73,33 @@ public class ClayKilnScreen extends AbstractContainerScreen<ClayKilnMenu> {
         super.init();
         // Vanilla furnace centers its title horizontally across the top
         this.titleLabelX = (this.imageWidth - this.font.width(this.title)) / 2;
+        curingButton = addRenderableWidget(new Button(leftPos + CURING_BUTTON_X,
+            topPos + CURING_BUTTON_Y, CURING_BUTTON_WIDTH, CURING_BUTTON_HEIGHT,
+            Component.translatable("container.swindustry.clay_kiln.start_curing"), button -> {
+                if (minecraft != null && minecraft.gameMode != null) {
+                    minecraft.gameMode.handleInventoryButtonClick(menu.containerId, ClayKilnMenu.BUTTON_START_CURING);
+                }
+            }, narration -> narration.get()) {
+            @Override
+            protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+                // Artwork is painted in the GUI atlas; the widget only selects a sprite.
+                int frame = menu.isCuringRequested() ? 3 : !active ? 2 : isHoveredOrFocused() ? 1 : 0;
+                graphics.blit(TEXTURE, getX(), getY(), 0, 176 + frame * 16, width, height);
+                graphics.drawCenteredString(font, getMessage(), getX() + width / 2,
+                    getY() + (height - font.lineHeight) / 2,
+                    active || menu.isCuringRequested() ? 0xFFFFFF : 0xDDDDDD);
+            }
+        });
+        curingButton.setTooltip(Tooltip.create(Component.translatable(
+            "container.swindustry.clay_kiln.start_curing_tooltip")));
+        updateCuringButton();
+    }
+
+    private void updateCuringButton() {
+        curingButton.active = menu.canRequestCuring();
+        curingButton.setMessage(Component.translatable(menu.isCuringRequested()
+            ? "container.swindustry.clay_kiln.curing_requested"
+            : "container.swindustry.clay_kiln.start_curing"));
     }
 
     @Override
@@ -109,6 +144,7 @@ public class ClayKilnScreen extends AbstractContainerScreen<ClayKilnMenu> {
 
     @Override
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+        updateCuringButton();
         renderBackground(graphics, mouseX, mouseY, partialTick);
         super.render(graphics, mouseX, mouseY, partialTick);
         renderTooltip(graphics, mouseX, mouseY);

@@ -83,7 +83,9 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     public static final int DATA_TIER = 6;
     public static final int DATA_FUEL_SECONDS = 7;
     public static final int DATA_HEAT = 8;
-    public static final int DATA_COUNT = 9;
+    public static final int DATA_CURING_REQUESTED = 9;
+    public static final int DATA_HAS_RAW_WALLS = 10;
+    public static final int DATA_COUNT = 11;
 
     public static final int MAX_HEAT = 1000;
 
@@ -95,6 +97,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private static final String KEY_EXPERIENCE = "StoredExperience";
     private static final String KEY_ACTIVE_JOB = "ActiveJob";
     private static final String KEY_HEAT = "Heat";
+    private static final String KEY_CURING_REQUESTED = "CuringRequested";
     private static final String KEY_SOAK = "Soak";
     private static final String KEY_SOAK_STARTS = "SoakStarts";
     private static final String KEY_HANDLER_SIZE = "Size";
@@ -174,6 +177,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     private float cookProgressFraction;
     private int cookDuration = KilnRecipe.DEFAULT_COOKING_TIME;
     private int heat;
+    private boolean curingRequested;
     private float storedExperience;
     private KilnStatus status = KilnStatus.INCOMPLETE;
     @Nullable
@@ -197,6 +201,8 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 case DATA_TIER -> tier();
                 case DATA_FUEL_SECONDS -> Math.min(Short.MAX_VALUE, Mth.ceil(litTime / 20.0F));
                 case DATA_HEAT -> Math.min(MAX_HEAT, Math.max(0, heat));
+                case DATA_CURING_REQUESTED -> curingRequested ? 1 : 0;
+                case DATA_HAS_RAW_WALLS -> isFormed() && !rawWalls.isEmpty() ? 1 : 0;
                 default -> 0;
             };
         }
@@ -603,6 +609,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
     }
 
     private void purgeOperationalState() {
+        curingRequested = false;
         litTime = 0;
         litDuration = 0;
         cookProgress = 0;
@@ -915,7 +922,19 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                     }
                 }
             }
+            // Check completion after tickSoak, before spending another fuel item.
+            if (kiln.curingRequested && kiln.rawWalls.isEmpty()) {
+                kiln.curingRequested = false;
+                dirty = true;
+            }
+            if (kiln.curingRequested) {
+                dirty = kiln.tryStartBurn(level) || dirty;
+            }
             dirty = kiln.runCookingStep(level) || dirty;
+            if (kiln.curingRequested && kiln.status != KilnStatus.WORKING) {
+                kiln.status = !kiln.isLit() ? KilnStatus.NEEDS_FUEL
+                    : kiln.chimneyChoked ? KilnStatus.CHOKED : KilnStatus.CURING;
+            }
         }
 
         if (operational && kiln.isLit() && kiln.chimneyChoked && level instanceof ServerLevel serverLevel) {
@@ -965,10 +984,32 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         }
     }
 
+    /** Server-only explicit request; loading fuel alone never starts an empty kiln. */
+    public boolean requestCuring() {
+        if (level == null || level.isClientSide || isRemoved() || !revalidate()
+            || rawWalls.isEmpty() || curingRequested) {
+            return false;
+        }
+        curingRequested = true;
+        setChanged();
+        return true;
+    }
+
+    /** Shared ignition path for a valid recipe and explicit shell curing. */
+    private boolean tryStartBurn(Level level) {
+        if (isLit()) return false;
+        ItemStack fuel = items.getStackInSlot(SLOT_FUEL);
+        int duration = burnDuration(fuel);
+        if (duration <= 0) return false;
+        litTime = duration;
+        litDuration = duration;
+        consumeFuel(level, fuel);
+        return true;
+    }
+
     /** One tick of the fire, the fuel and the thing being cooked. Returns whether to save. */
     private boolean runCookingStep(Level level) {
         ItemStack input = items.getStackInSlot(SLOT_INPUT);
-        ItemStack fuel = items.getStackInSlot(SLOT_FUEL);
         boolean dirty = false;
         if (input.isEmpty()) {
             status = chimneyChoked ? KilnStatus.CHOKED : KilnStatus.IDLE;
@@ -1000,14 +1041,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
 
         cookDuration = Math.max(1, job.cookingTime());
 
-        if (!isLit() && !fuel.isEmpty()) {
-            litTime = burnDuration(fuel);
-            litDuration = litTime;
-            if (isLit()) {
-                consumeFuel(level, fuel);
-                dirty = true;
-            }
-        }
+        dirty = tryStartBurn(level) || dirty;
 
         if (!isLit()) {
             status = KilnStatus.NEEDS_FUEL;
@@ -1100,11 +1134,14 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
                 continue;
             }
 
+            // Replacing a raw wall synchronously calls forgetRawWall from its block hook.
+            // Remove through the iterator first, so that hook cannot mutate its backing set.
+            iterator.remove();
+            soakStarts.remove(packed);
             level.setBlock(pos, ModBlocks.CLAY_BRICKS.get().defaultBlockState(), Block.UPDATE_ALL);
             spawnCuringEffects(level, pos);
             changed = true;
             invalidateCeiling();
-            iterator.remove();
         }
 
         if (rawWalls.isEmpty()) {
@@ -1496,6 +1533,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
             ? loadedExperience
             : 0.0F;
         heat = Mth.clamp(tag.getInt(KEY_HEAT), 0, MAX_HEAT);
+        curingRequested = tag.getBoolean(KEY_CURING_REQUESTED);
         chimneyChoked = tag.getBoolean("Choked");
         extraChimneyHeight = Math.max(0, tag.getInt("ExtraChimney"));
         activeJobKey = cookProgress > 0 && tag.contains(KEY_ACTIVE_JOB, Tag.TAG_STRING)
@@ -1522,6 +1560,7 @@ public class ClayKilnBlockEntity extends MultiblockControllerEntity implements M
         tag.put(KEY_SOAK_STARTS, soakStartList);
         tag.putFloat(KEY_EXPERIENCE, storedExperience);
         tag.putInt(KEY_HEAT, heat);
+        tag.putBoolean(KEY_CURING_REQUESTED, curingRequested);
         tag.putBoolean("Choked", chimneyChoked);
         tag.putInt("ExtraChimney", extraChimneyHeight);
         if (cookProgress > 0 && activeJobKey != null) {

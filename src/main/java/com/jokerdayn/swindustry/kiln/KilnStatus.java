@@ -14,7 +14,8 @@ public enum KilnStatus {
     WORKING(6, "working"),
     CHOKED(7, "choked"),
     TOO_COLD(8, "too_cold"),
-    WARMING_UP(9, "warming_up");
+    WARMING_UP(9, "warming_up"),
+    CURING(10, "curing");
 
     private static final KilnStatus[] BY_ID = values();
 

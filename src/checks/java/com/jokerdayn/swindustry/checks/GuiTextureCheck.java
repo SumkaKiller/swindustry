@@ -21,7 +21,7 @@ public final class GuiTextureCheck {
 
     private static final int SHEET_SIZE = 256;
     private static final int PANEL_WIDTH = 176;
-    private static final int PANEL_HEIGHT = 166;
+    private static final int PANEL_HEIGHT = 174;
 
     private GuiTextureCheck() {}
 
@@ -32,11 +32,12 @@ public final class GuiTextureCheck {
             "expected a 256x256 atlas, got " + image.getWidth() + "x" + image.getHeight());
 
         check(alphaCount(image, 0, 0, PANEL_WIDTH, PANEL_HEIGHT) >= 28_000,
-            "the 176x166 panel contains an unexpected transparent region");
+            "the 176x174 panel contains an unexpected transparent region");
         requireOpaqueRect(image, 42, 17, 18, 18, "input slot frame");
         requireOpaqueRect(image, 42, 53, 18, 18, "fuel slot frame");
-        requireOpaqueRect(image, 8, 84, 162, 54, "player inventory grid");
-        requireOpaqueRect(image, 8, 142, 162, 18, "hotbar");
+        requireOpaqueRect(image, 8, 92, 162, 54, "player inventory grid");
+        requireOpaqueRect(image, 8, 150, 162, 18, "hotbar");
+        requireOpaqueRect(image, 74, 60, 72, 14, "painted curing button");
 
         check(alphaCount(image, 176, 0, 14, 14) >= 50, "fire frame is missing");
         check(alphaCount(image, 176, 14, 24, 17) >= 100, "progress arrow is missing");
@@ -133,7 +134,8 @@ public final class GuiTextureCheck {
                 boolean fire = x >= 176 && x < 190 && y < 14;
                 boolean arrow = x >= 176 && x < 200 && y >= 14 && y < 31;
                 boolean gauge = x >= 201 && x < 214 && y < 52;
-                if (!panel && !fire && !arrow && !gauge) {
+                boolean buttons = x < 72 && y >= 176 && y < 238 && (y - 176) % 16 < 14;
+                if (!panel && !fire && !arrow && !gauge && !buttons) {
                     return false;
                 }
             }

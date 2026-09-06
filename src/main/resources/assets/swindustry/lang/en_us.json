@@ -21,6 +21,10 @@
   "item.swindustry.bronze_boots": "Bronze Boots",
 
   "container.swindustry.clay_kiln": "Clay Kiln",
+  "container.swindustry.clay_kiln.start_curing": "Fire up",
+  "container.swindustry.clay_kiln.curing_requested": "Curing queued",
+  "container.swindustry.clay_kiln.start_curing_tooltip": "Fire the raw shell without an input item. Load fuel; shell curing stops feeding fuel once the walls are fired.",
+  "container.swindustry.clay_kiln.status.curing": "Firing shell",
   "container.swindustry.clay_kiln.incomplete": "Kiln incomplete",
   "container.swindustry.clay_kiln.status.incomplete": "Structure breached",
   "container.swindustry.clay_kiln.status.idle": "Ready",

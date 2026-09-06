@@ -21,6 +21,10 @@
   "item.swindustry.bronze_boots": "Бронзовые ботинки",
 
   "container.swindustry.clay_kiln": "Глиняная печь",
+  "container.swindustry.clay_kiln.start_curing": "Растопить",
+  "container.swindustry.clay_kiln.curing_requested": "Обжиг задан",
+  "container.swindustry.clay_kiln.start_curing_tooltip": "Обжечь сырой корпус без материала во входе. Загрузите топливо; после обжига стен подача топлива для корпуса прекратится.",
+  "container.swindustry.clay_kiln.status.curing": "Обжиг корпуса",
   "container.swindustry.clay_kiln.incomplete": "Печь не собрана",
   "container.swindustry.clay_kiln.status.incomplete": "Конструкция нарушена",
   "container.swindustry.clay_kiln.status.idle": "Готова к работе",

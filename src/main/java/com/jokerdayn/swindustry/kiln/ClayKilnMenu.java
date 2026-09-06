@@ -25,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
  * a flue — so the one screen a player looks at should not also be a puzzle.</p>
  */
 public class ClayKilnMenu extends AbstractContainerMenu {
+    public static final int BUTTON_START_CURING = 0;
 
     private static final int KILN_SLOTS = ClayKilnBlockEntity.SLOT_COUNT;
     private static final int INVENTORY_START = KILN_SLOTS;
@@ -87,11 +88,11 @@ public class ClayKilnMenu extends AbstractContainerMenu {
     private void addPlayerSlots(Inventory playerInventory) {
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
-                addSlot(new Slot(playerInventory, column + row * 9 + 9, 8 + column * 18, 84 + row * 18));
+                addSlot(new Slot(playerInventory, column + row * 9 + 9, 8 + column * 18, 92 + row * 18));
             }
         }
         for (int column = 0; column < 9; column++) {
-            addSlot(new Slot(playerInventory, column, 8 + column * 18, 142));
+            addSlot(new Slot(playerInventory, column, 8 + column * 18, 150));
         }
     }
 
@@ -131,6 +132,25 @@ public class ClayKilnMenu extends AbstractContainerMenu {
 
     public boolean isLit() {
         return data.get(ClayKilnBlockEntity.DATA_LIT_TIME) > 0;
+    }
+
+    public boolean isCuringRequested() {
+        return data.get(ClayKilnBlockEntity.DATA_CURING_REQUESTED) != 0;
+    }
+
+    public boolean canRequestCuring() {
+        return isStructureFormed() && data.get(ClayKilnBlockEntity.DATA_HAS_RAW_WALLS) != 0
+            && !isCuringRequested();
+    }
+
+    @Override
+    public boolean clickMenuButton(Player player, int id) {
+        if (id != BUTTON_START_CURING || player.level().isClientSide
+            || player.containerMenu != this || !stillValid(player)
+            || player.level().getBlockEntity(pos) != blockEntity || blockEntity == null) {
+            return false;
+        }
+        return blockEntity.requestCuring();
     }
 
     /** How much of the current fuel is left, 0 to 1. */
